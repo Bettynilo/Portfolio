@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d0d0f">
+<title>Bolle e DDT: estrazione automatica e coda di validazione (demo)</title>
+<meta name="description" content="Demo: AI Builder estrae i dati dai DDT in arrivo, Power Automate registra quelli sicuri e manda in coda solo i campi dubbi.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  :root { --bg:#0d0d0f; --panel:#151518; --panel-2:#1c1c20; --line:rgba(234,230,223,.12); --ink:#eae6df; --ink-2:#8f8b84;
+    --gold:#c8a97e; --good:#8fb996; --bad:#d98c7a; --sans:"Geist","Helvetica Neue",Arial,sans-serif; --mono:"Geist Mono",ui-monospace,Menlo,monospace; color-scheme:dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; }
+  button, input, select { font:inherit; color:inherit; }
+  button { cursor:pointer; background:none; border:0; }
+  .mono { font-family:var(--mono); font-size:12px; } .muted { color:var(--ink-2); }
+  .wrap { max-width:1320px; margin:0 auto; padding:clamp(20px,3vw,44px); display:grid; gap:20px; }
+  h1 { margin:0; font-size:clamp(28px,3.8vw,48px); font-weight:300; letter-spacing:-.045em; line-height:1.02; }
+  .sub { margin:10px 0 0; max-width:64ch; line-height:1.55; color:var(--ink-2); }
+  .grid { display:grid; gap:14px; }
+  .kpis { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; }
+  .kpi .v { font-size:clamp(26px,2.6vw,36px); font-weight:300; letter-spacing:-.04em; margin-top:8px; line-height:1; }
+  .kpi .d { margin-top:8px; font-size:12px; font-family:var(--mono); color:var(--ink-2); }
+  .cols { display:grid; grid-template-columns:minmax(0,340px) minmax(0,1fr); gap:16px; align-items:start; }
+  h2 { margin:0 0 4px; font-size:17px; font-weight:500; }
+  .coda { display:grid; gap:8px; margin-top:12px; max-height:560px; overflow-y:auto; padding-right:4px; }
+  .doc { display:grid; gap:4px; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--panel-2); text-align:left; }
+  .doc:hover { border-color:var(--ink-2); }
+  .doc[aria-current="true"] { border-color:var(--gold); background:rgba(200,169,126,.10); }
+  .doc .r { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .tag { font-family:var(--mono); font-size:10px; padding:3px 8px; border-radius:999px; white-space:nowrap; }
+  .t-auto { background:rgba(143,185,150,.18); color:var(--good); }
+  .t-val { background:rgba(200,169,126,.18); color:var(--gold); }
+  .t-ok { background:rgba(143,185,150,.18); color:var(--good); }
+  .campi { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:14px; }
+  .campo { display:grid; gap:6px; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--panel-2); }
+  .campo.dubbio { border-color:rgba(200,169,126,.55); background:rgba(200,169,126,.08); }
+  .campo label { font-family:var(--mono); font-size:11px; color:var(--ink-2); display:flex; justify-content:space-between; gap:8px; }
+  .campo input { background:var(--panel); border:1px solid var(--line); border-radius:8px; min-height:38px; padding:0 10px; width:100%; }
+  .campo input:focus { outline:1px solid var(--gold); }
+  .conf { font-family:var(--mono); font-size:10px; }
+  .conf.bassa { color:var(--gold); } .conf.alta { color:var(--good); }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-top:12px; }
+  th, td { text-align:right; padding:8px 6px; border-top:1px solid var(--line); }
+  th:first-child, td:first-child, td:nth-child(2) { text-align:left; }
+  th { font-family:var(--mono); font-size:10px; font-weight:400; color:var(--ink-2); text-transform:uppercase; letter-spacing:.04em; }
+  .azioni { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap }
+  .btn { min-height:44px; padding:0 18px; border-radius:999px; background:var(--gold); color:#0d0d0f; font-weight:500; }
+  .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--ink); }
+  .flusso { display:grid; gap:8px; font-family:var(--mono); font-size:12px; margin-top:12px; }
+  .flusso span { padding:8px 12px; border:1px solid var(--line); border-radius:8px; }
+  .flusso b { color:var(--gold); font-weight:400; }
+  footer { color:var(--ink-2); font-size:13px; line-height:1.6; border-top:1px solid var(--line); padding-top:18px; }
+  @media (max-width:1000px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} .cols{grid-template-columns:1fr;} .campi{grid-template-columns:1fr;} }
+</style>
+<style id="amir-bar-css">
+.amir-bar{position:relative;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+ padding:10px max(16px,env(safe-area-inset-left,0px));background:#0d0d0f;color:#eae6df;border-bottom:1px solid rgba(234,230,223,.12);
+ font:400 13px/1.3 Geist,'Helvetica Neue',Arial,sans-serif;letter-spacing:.01em}
+.amir-bar a{color:#eae6df;text-decoration:none;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid rgba(234,230,223,.2);border-radius:999px;transition:border-color .2s,color .2s}
+.amir-bar a:hover,.amir-bar a:focus-visible{border-color:#c8a97e;color:#c8a97e;outline:none}
+.amir-bar span{color:#8f8b84;font-family:'Geist Mono',Menlo,monospace;font-size:12px}
+.amir-bar b{font-weight:400;color:#c8a97e}
+</style>
+</head>
+<body>
+<nav class="amir-bar" aria-label="Portfolio"><a href="../index.html#/work/delivery-notes" id="amirBack" data-it="← Torna al progetto" data-en="← Back to the project">← Torna al progetto</a><span><span id="amirName" data-it="Estrazione DDT" data-en="Delivery note extraction">Estrazione DDT</span> · demo</span></nav>
+<script>(function(){var l='it';try{l=localStorage.getItem('lang')||'it'}catch(e){}
+document.querySelectorAll('.amir-bar [data-'+l+']').forEach(function(el){el.textContent=el.getAttribute('data-'+l)});})();</script>
+<div class="wrap">
+  <header>
+    <p class="mono muted">Power Platform · AI Builder + Power Automate · documenti sintetici</p>
+    <h1>Bolle in arrivo: estratte, controllate, registrate</h1>
+    <p class="sub">Il modello di elaborazione documenti legge i DDT che arrivano via mail. Se tutti i campi superano la soglia di confidenza dell'80% il documento viene registrato da solo; altrimenti finisce in questa coda, dove una persona controlla <b>solo i campi dubbi</b>, evidenziati in oro.</p>
+  </header>
+
+  <section class="grid kpis" id="kpis"></section>
+
+  <div class="cols">
+    <div class="card">
+      <h2>Coda di validazione</h2>
+      <p class="mono muted">In ordine di confidenza più bassa</p>
+      <div class="coda" id="coda"></div>
+    </div>
+    <div class="card" id="dettaglio"></div>
+  </div>
+
+  <div class="card">
+    <h2>Il flusso dietro</h2>
+    <div class="flusso">
+      <span>1 · <b>Quando arriva una mail</b> con allegato PDF alla casella bolle@</span>
+      <span>2 · <b>AI Builder</b>: estrazione campi e righe dal modello di elaborazione documenti addestrato su 30 bolle</span>
+      <span>3 · <b>Condizione</b>: confidenza minima ≥ 0,80 e partita IVA presente in anagrafica</span>
+      <span>4a · sì → <b>registra in Dataverse</b>, allega il PDF, notifica al magazzino</span>
+      <span>4b · no → <b>crea attività di validazione</b> e apri l'app: la persona corregge solo i campi dubbi</span>
+      <span>5 · ogni correzione viene salvata come esempio: il modello si riaddestra ogni trimestre</span>
+    </div>
+  </div>
+
+  <footer>
+    Progetto dimostrativo di Betty. Nel repository: la specifica del modello AI Builder, il flusso Power Automate passo per passo, le regole di validazione e lo script che genera gli esiti di estrazione usati da questa demo.
+  </footer>
+</div>
+
+<script>
+const DATA = {"soglia":0.8,"documenti":[{"file":"DDT_ACCIAI_1000.pdf","pagine":2,"campi":{"fornitore":{"valore":"Acciaierie Padane SpA","confidenza":0.919},"partita_iva":{"valore":"IT04455667788","confidenza":0.911},"numero_ddt":{"valore":"3517/26","confidenza":0.923},"data":{"valore":"13/03/2026","confidenza":0.952},"causale":{"valore":"Reso a fornitore","confidenza":0.613},"colli":{"valore":21,"confidenza":0.958},"peso_kg":{"valore":727.6,"confidenza":0.916}},"righe":[{"codice":{"valore":"VIT-0930","confidenza":0.915},"descrizione":{"valore":"Vite TCEI M8x40","confidenza":0.918},"quantita":{"valore":324.8,"confidenza":0.59},"unita":{"valore":"pz","confidenza":0.912}},{"codice":{"valore":"ACC-2050","confidenza":0.983},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.955},"quantita":{"valore":33.9,"confidenza":0.957},"unita":{"valore":"kg","confidenza":0.921}}],"confidenza_minima":0.59,"stato":"da_validare"},{"file":"DDT_ACCIAI_1001.pdf","pagine":1,"campi":{"fornitore":{"valore":"Acciaierie Padane SpA","confidenza":0.966},"partita_iva":{"valore":"IT04455667788","confidenza":0.961},"numero_ddt":{"valore":"8814/26","confidenza":0.917},"data":{"valore":"09/03/2026","confidenza":0.926},"causale":{"valore":"Conto lavorazione","confidenza":0.958},"colli":{"valore":13,"confidenza":0.952},"peso_kg":{"valore":193.3,"confidenza":0.939}},"righe":[{"codice":{"valore":"ACC-2050","confidenza":0.975},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.926},"quantita":{"valore":356.3,"confidenza":0.972},"unita":{"valore":"kg","confidenza":0.983}},{"codice":{"valore":"IMB-0110","confidenza":0.985},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.984},"quantita":{"valore":689.8,"confidenza":0.926},"unita":{"valore":"pz","confidenza":0.971}}],"confidenza_minima":0.917,"stato":"automatico"},{"file":"DDT_TECNOP_1002.pdf","pagine":1,"campi":{"fornitore":{"valore":"Tecnoplast Srl","confidenza":0.956},"partita_iva":{"valore":"IT05566778899","confidenza":0.924},"numero_ddt":{"valore":"3675/26","confidenza":0.927},"data":{"valore":"11/03/2026","confidenza":0.952},"causale":{"valore":"Conto lavorazione","confidenza":0.982},"colli":{"valore":20,"confidenza":0.93},"peso_kg":{"valore":896.2,"confidenza":0.94}},"righe":[{"codice":{"valore":"PLA-1180","confidenza":0.967},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.987},"quantita":{"valore":542.0,"confidenza":0.917},"unita":{"valore":"kg","confidenza":0.911}},{"codice":{"valore":"ELE-4420","confidenza":0.679},"descrizione":{"valore":"Cavo FG16OR16 3x2,5","confidenza":0.994},"quantita":{"valore":783.4,"confidenza":0.914},"unita":{"valore":"m","confidenza":0.969}},{"codice":{"valore":"ELE-4420","confidenza":0.914},"descrizione":{"valore":"Cavo FG16OR16 3x2,5","confidenza":0.943},"quantita":{"valore":193.7,"confidenza":0.956},"unita":{"valore":"m","confidenza":0.965}}],"confidenza_minima":0.679,"stato":"da_validare"},{"file":"DDT_IMBALL_1003.pdf","pagine":1,"campi":{"fornitore":{"valore":"Imballaggi Verdi Srl","confidenza":0.738},"partita_iva":{"valore":"IT08899001122","confidenza":0.932},"numero_ddt":{"valore":"6009/26","confidenza":0.977},"data":{"valore":"03/03/2026","confidenza":0.931},"causale":{"valore":"Vendita","confidenza":0.953},"colli":{"valore":21,"confidenza":0.94},"peso_kg":{"valore":409.8,"confidenza":0.917}},"righe":[{"codice":{"valore":"PLA-1180","confidenza":0.919},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.955},"quantita":{"valore":574.5,"confidenza":0.628},"unita":{"valore":"kg","confidenza":0.917}},{"codice":{"valore":"VIT-0930","confidenza":0.96},"descrizione":{"valore":"Vite TCEI M8x40","confidenza":0.973},"quantita":{"valore":597.4,"confidenza":0.959},"unita":{"valore":"pz","confidenza":0.954}}],"confidenza_minima":0.628,"stato":"da_validare"},{"file":"DDT_IMBALL_1004.pdf","pagine":2,"campi":{"fornitore":{"valore":"Imballaggi Verdi Srl","confidenza":0.955},"partita_iva":{"valore":"IT08899001122","confidenza":0.948},"numero_ddt":{"valore":"5928/26","confidenza":0.954},"data":{"valore":"21/03/2026","confidenza":0.956},"causale":{"valore":"Reso a fornitore","confidenza":0.994},"colli":{"valore":19,"confidenza":0.965},"peso_kg":{"valore":786.1,"confidenza":0.967}},"righe":[{"codice":{"valore":"PLA-1180","confidenza":0.992},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.987},"quantita":{"valore":488.5,"confidenza":0.949},"unita":{"valore":"kg","confidenza":0.973}}],"confidenza_minima":0.948,"stato":"automatico"},{"file":"DDT_ACCIAI_1005.pdf","pagine":1,"campi":{"fornitore":{"valore":"Acciaierie Padane SpA","confidenza":0.571},"partita_iva":{"valore":"IT04455667788","confidenza":0.942},"numero_ddt":{"valore":"9764/26","confidenza":0.921},"data":{"valore":"09/03/2026","confidenza":0.914},"causale":{"valore":"Conto lavorazione","confidenza":0.994},"colli":{"valore":26,"confidenza":0.975},"peso_kg":{"valore":138.7,"confidenza":0.981}},"righe":[{"codice":{"valore":"IMB-0110","confidenza":0.95},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.971},"quantita":{"valore":746.9,"confidenza":0.993},"unita":{"valore":"pz","confidenza":0.917}}],"confidenza_minima":0.571,"stato":"da_validare"},{"file":"DDT_VITERI_1006.pdf","pagine":1,"campi":{"fornitore":{"valore":"Viteria Bresciana Snc","confidenza":0.977},"partita_iva":{"valore":"IT06677889900","confidenza":0.983},"numero_ddt":{"valore":"5655/26","confidenza":0.92},"data":{"valore":"14/03/2026","confidenza":0.911},"causale":{"valore":"Reso a fornitore","confidenza":0.983},"colli":{"valore":14,"confidenza":0.972},"peso_kg":{"valore":113.9,"confidenza":0.914}},"righe":[{"codice":{"valore":"IMB-0110","confidenza":0.927},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.961},"quantita":{"valore":764.6,"confidenza":0.932},"unita":{"valore":"pz","confidenza":0.962}},{"codice":{"valore":"PLA-1180","confidenza":0.922},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.969},"quantita":{"valore":594.6,"confidenza":0.957},"unita":{"valore":"kg","confidenza":0.977}},{"codice":{"valore":"PLA-1180","confidenza":0.949},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.984},"quantita":{"valore":535.5,"confidenza":0.966},"unita":{"valore":"kg","confidenza":0.933}}],"confidenza_minima":0.911,"stato":"automatico"},{"file":"DDT_TECNOP_1007.pdf","pagine":2,"campi":{"fornitore":{"valore":"Tecnoplast Srl","confidenza":0.986},"partita_iva":{"valore":"IT05566778899","confidenza":0.969},"numero_ddt":{"valore":"9908/26","confidenza":0.973},"data":{"valore":"02/03/2026","confidenza":0.956},"causale":{"valore":"Reso a fornitore","confidenza":0.993},"colli":{"valore":23,"confidenza":0.958},"peso_kg":{"valore":157.8,"confidenza":0.622}},"righe":[{"codice":{"valore":"PLA-1180","confidenza":0.952},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.919},"quantita":{"valore":168.9,"confidenza":0.974},"unita":{"valore":"kg","confidenza":0.629}},{"codice":{"valore":"ELE-4420","confidenza":0.93},"descrizione":{"valore":"Cavo FG16OR16 3x2,5","confidenza":0.921},"quantita":{"valore":789.9,"confidenza":0.93},"unita":{"valore":"m","confidenza":0.966}},{"codice":{"valore":"PLA-1180","confidenza":0.984},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.977},"quantita":{"valore":351.1,"confidenza":0.722},"unita":{"valore":"kg","confidenza":0.941}},{"codice":{"valore":"ACC-2050","confidenza":0.988},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.981},"quantita":{"valore":157.9,"confidenza":0.963},"unita":{"valore":"kg","confidenza":0.947}}],"confidenza_minima":0.622,"stato":"da_validare"},{"file":"DDT_TECNOP_1008.pdf","pagine":1,"campi":{"fornitore":{"valore":"Tecnoplast Srl","confidenza":0.978},"partita_iva":{"valore":"IT05566778899","confidenza":0.977},"numero_ddt":{"valore":"3935/26","confidenza":0.974},"data":{"valore":"09/03/2026","confidenza":0.968},"causale":{"valore":"Campionatura","confidenza":0.953},"colli":{"valore":11,"confidenza":0.967},"peso_kg":{"valore":433.3,"confidenza":0.929}},"righe":[{"codice":{"valore":"PLA-1180","confidenza":0.994},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.921},"quantita":{"valore":644.4,"confidenza":0.957},"unita":{"valore":"kg","confidenza":0.65}},{"codice":{"valore":"ELE-4420","confidenza":0.916},"descrizione":{"valore":"Cavo FG16OR16 3x2,5","confidenza":0.995},"quantita":{"valore":198.4,"confidenza":0.529},"unita":{"valore":"m","confidenza":0.937}},{"codice":{"valore":"PLA-1180","confidenza":0.99},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.923},"quantita":{"valore":550.3,"confidenza":0.975},"unita":{"valore":"kg","confidenza":0.994}}],"confidenza_minima":0.529,"stato":"da_validare"},{"file":"DDT_IMBALL_1009.pdf","pagine":1,"campi":{"fornitore":{"valore":"Imballaggi Verdi Srl","confidenza":0.915},"partita_iva":{"valore":"IT08899001122","confidenza":0.954},"numero_ddt":{"valore":"6874/26","confidenza":0.95},"data":{"valore":"11/03/2026","confidenza":0.91},"causale":{"valore":"Conto lavorazione","confidenza":0.976},"colli":{"valore":22,"confidenza":0.911},"peso_kg":{"valore":163.1,"confidenza":0.955}},"righe":[{"codice":{"valore":"ACC-2050","confidenza":0.975},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.973},"quantita":{"valore":105.2,"confidenza":0.929},"unita":{"valore":"kg","confidenza":0.935}},{"codice":{"valore":"IMB-0110","confidenza":0.936},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.937},"quantita":{"valore":375.8,"confidenza":0.941},"unita":{"valore":"pz","confidenza":0.946}},{"codice":{"valore":"ACC-2050","confidenza":0.957},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.926},"quantita":{"valore":155.7,"confidenza":0.983},"unita":{"valore":"kg","confidenza":0.97}}],"confidenza_minima":0.91,"stato":"automatico"},{"file":"DDT_TECNOP_1010.pdf","pagine":1,"campi":{"fornitore":{"valore":"Tecnoplast Srl","confidenza":0.914},"partita_iva":{"valore":"IT05566778899","confidenza":0.99},"numero_ddt":{"valore":"7257/26","confidenza":0.947},"data":{"valore":"09/03/2026","confidenza":0.929},"causale":{"valore":"Campionatura","confidenza":0.976},"colli":{"valore":9,"confidenza":0.649},"peso_kg":{"valore":314.8,"confidenza":0.956}},"righe":[{"codice":{"valore":"PLA-1180","confidenza":0.937},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.98},"quantita":{"valore":756.8,"confidenza":0.927},"unita":{"valore":"kg","confidenza":0.983}},{"codice":{"valore":"IMB-0110","confidenza":0.935},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.993},"quantita":{"valore":769.2,"confidenza":0.993},"unita":{"valore":"pz","confidenza":0.956}},{"codice":{"valore":"ELE-4420","confidenza":0.935},"descrizione":{"valore":"Cavo FG16OR16 3x2,5","confidenza":0.526},"quantita":{"valore":379.1,"confidenza":0.969},"unita":{"valore":"m","confidenza":0.936}}],"confidenza_minima":0.526,"stato":"da_validare"},{"file":"DDT_IMBALL_1011.pdf","pagine":2,"campi":{"fornitore":{"valore":"Imballaggi Verdi Srl","confidenza":0.971},"partita_iva":{"valore":"IT08899001122","confidenza":0.99},"numero_ddt":{"valore":"736/26","confidenza":0.942},"data":{"valore":"13/03/2026","confidenza":0.97},"causale":{"valore":"Campionatura","confidenza":0.919},"colli":{"valore":13,"confidenza":0.927},"peso_kg":{"valore":63.3,"confidenza":0.911}},"righe":[{"codice":{"valore":"VIT-0930","confidenza":0.927},"descrizione":{"valore":"Vite TCEI M8x40","confidenza":0.984},"quantita":{"valore":507.7,"confidenza":0.955},"unita":{"valore":"pz","confidenza":0.973}}],"confidenza_minima":0.911,"stato":"automatico"},{"file":"DDT_IMBALL_1012.pdf","pagine":1,"campi":{"fornitore":{"valore":"Imballaggi Verdi Srl","confidenza":0.937},"partita_iva":{"valore":"IT08899001122","confidenza":0.995},"numero_ddt":{"valore":"8388/26","confidenza":0.92},"data":{"valore":"21/03/2026","confidenza":0.97},"causale":{"valore":"Conto lavorazione","confidenza":0.946},"colli":{"valore":25,"confidenza":0.925},"peso_kg":{"valore":381.5,"confidenza":0.921}},"righe":[{"codice":{"valore":"ACC-2050","confidenza":0.938},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.968},"quantita":{"valore":145.5,"confidenza":0.92},"unita":{"valore":"kg","confidenza":0.945}}],"confidenza_minima":0.92,"stato":"automatico"},{"file":"DDT_VITERI_1013.pdf","pagine":1,"campi":{"fornitore":{"valore":"Viteria Bresciana Snc","confidenza":0.925},"partita_iva":{"valore":"IT06677889900","confidenza":0.97},"numero_ddt":{"valore":"9549/26","confidenza":0.98},"data":{"valore":"10/03/2026","confidenza":0.939},"causale":{"valore":"Campionatura","confidenza":0.926},"colli":{"valore":7,"confidenza":0.946},"peso_kg":{"valore":375.6,"confidenza":0.661}},"righe":[{"codice":{"valore":"IMB-0110","confidenza":0.972},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.929},"quantita":{"valore":710.2,"confidenza":0.965},"unita":{"valore":"pz","confidenza":0.924}},{"codice":{"valore":"ACC-2050","confidenza":0.987},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.964},"quantita":{"valore":203.8,"confidenza":0.912},"unita":{"valore":"kg","confidenza":0.914}}],"confidenza_minima":0.661,"stato":"da_validare"},{"file":"DDT_IMBALL_1014.pdf","pagine":1,"campi":{"fornitore":{"valore":"Imballaggi Verdi Srl","confidenza":0.985},"partita_iva":{"valore":"IT08899001122","confidenza":0.918},"numero_ddt":{"valore":"9368/26","confidenza":0.952},"data":{"valore":"11/03/2026","confidenza":0.953},"causale":{"valore":"Campionatura","confidenza":0.951},"colli":{"valore":10,"confidenza":0.914},"peso_kg":{"valore":876.9,"confidenza":0.964}},"righe":[{"codice":{"valore":"PLA-1180","confidenza":0.91},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.929},"quantita":{"valore":239.5,"confidenza":0.949},"unita":{"valore":"kg","confidenza":0.929}},{"codice":{"valore":"VIT-0930","confidenza":0.923},"descrizione":{"valore":"Vite TCEI M8x40","confidenza":0.921},"quantita":{"valore":575.9,"confidenza":0.968},"unita":{"valore":"pz","confidenza":0.949}},{"codice":{"valore":"PLA-1180","confidenza":0.946},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.939},"quantita":{"valore":592.6,"confidenza":0.93},"unita":{"valore":"kg","confidenza":0.953}}],"confidenza_minima":0.91,"stato":"automatico"},{"file":"DDT_ELETTR_1015.pdf","pagine":2,"campi":{"fornitore":{"valore":"Elettroforniture Adriatica Srl","confidenza":0.987},"partita_iva":{"valore":"IT07788990011","confidenza":0.979},"numero_ddt":{"valore":"1227/26","confidenza":0.958},"data":{"valore":"03/03/2026","confidenza":0.945},"causale":{"valore":"Campionatura","confidenza":0.94},"colli":{"valore":3,"confidenza":0.967},"peso_kg":{"valore":376.3,"confidenza":0.962}},"righe":[{"codice":{"valore":"ACC-2050","confidenza":0.925},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.912},"quantita":{"valore":152.1,"confidenza":0.951},"unita":{"valore":"kg","confidenza":0.929}},{"codice":{"valore":"PLA-1180","confidenza":0.915},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.994},"quantita":{"valore":294.2,"confidenza":0.939},"unita":{"valore":"kg","confidenza":0.961}},{"codice":{"valore":"IMB-0110","confidenza":0.921},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.955},"quantita":{"valore":635.9,"confidenza":0.932},"unita":{"valore":"pz","confidenza":0.923}}],"confidenza_minima":0.912,"stato":"automatico"},{"file":"DDT_ELETTR_1016.pdf","pagine":1,"campi":{"fornitore":{"valore":"Elettroforniture Adriatica Srl","confidenza":0.97},"partita_iva":{"valore":"IT07788990011","confidenza":0.921},"numero_ddt":{"valore":"8391/26","confidenza":0.952},"data":{"valore":"17/03/2026","confidenza":0.962},"causale":{"valore":"Campionatura","confidenza":0.93},"colli":{"valore":10,"confidenza":0.942},"peso_kg":{"valore":501.2,"confidenza":0.682}},"righe":[{"codice":{"valore":"ACC-2050","confidenza":0.982},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.941},"quantita":{"valore":406.0,"confidenza":0.926},"unita":{"valore":"kg","confidenza":0.979}},{"codice":{"valore":"IMB-0110","confidenza":0.961},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.957},"quantita":{"valore":781.5,"confidenza":0.956},"unita":{"valore":"pz","confidenza":0.915}},{"codice":{"valore":"IMB-0110","confidenza":0.974},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.948},"quantita":{"valore":597.5,"confidenza":0.984},"unita":{"valore":"pz","confidenza":0.965}}],"confidenza_minima":0.682,"stato":"da_validare"},{"file":"DDT_TECNOP_1017.pdf","pagine":1,"campi":{"fornitore":{"valore":"Tecnoplast Srl","confidenza":0.91},"partita_iva":{"valore":"IT05566778899","confidenza":0.926},"numero_ddt":{"valore":"7213/26","confidenza":0.97},"data":{"valore":"17/03/2026","confidenza":0.971},"causale":{"valore":"Conto lavorazione","confidenza":0.987},"colli":{"valore":8,"confidenza":0.989},"peso_kg":{"valore":94.8,"confidenza":0.931}},"righe":[{"codice":{"valore":"VIT-0930","confidenza":0.966},"descrizione":{"valore":"Vite TCEI M8x40","confidenza":0.979},"quantita":{"valore":168.0,"confidenza":0.969},"unita":{"valore":"pz","confidenza":0.972}},{"codice":{"valore":"IMB-0110","confidenza":0.957},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.913},"quantita":{"valore":571.0,"confidenza":0.912},"unita":{"valore":"pz","confidenza":0.918}},{"codice":{"valore":"IMB-0110","confidenza":0.968},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.982},"quantita":{"valore":662.4,"confidenza":0.971},"unita":{"valore":"pz","confidenza":0.974}}],"confidenza_minima":0.91,"stato":"automatico"},{"file":"DDT_TECNOP_1018.pdf","pagine":1,"campi":{"fornitore":{"valore":"Tecnoplast Srl","confidenza":0.963},"partita_iva":{"valore":"IT05566778899","confidenza":0.985},"numero_ddt":{"valore":"3067/26","confidenza":0.74},"data":{"valore":"19/03/2026","confidenza":0.979},"causale":{"valore":"Reso a fornitore","confidenza":0.914},"colli":{"valore":16,"confidenza":0.965},"peso_kg":{"valore":354.4,"confidenza":0.943}},"righe":[{"codice":{"valore":"ELE-4420","confidenza":0.955},"descrizione":{"valore":"Cavo FG16OR16 3x2,5","confidenza":0.987},"quantita":{"valore":104.4,"confidenza":0.942},"unita":{"valore":"m","confidenza":0.984}}],"confidenza_minima":0.74,"stato":"da_validare"},{"file":"DDT_VITERI_1019.pdf","pagine":2,"campi":{"fornitore":{"valore":"Viteria Bresciana Snc","confidenza":0.935},"partita_iva":{"valore":"IT06677889900","confidenza":0.943},"numero_ddt":{"valore":"3920/26","confidenza":0.995},"data":{"valore":"07/03/2026","confidenza":0.971},"causale":{"valore":"Conto lavorazione","confidenza":0.928},"colli":{"valore":29,"confidenza":0.928},"peso_kg":{"valore":863.7,"confidenza":0.926}},"righe":[{"codice":{"valore":"PLA-1180","confidenza":0.923},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.708},"quantita":{"valore":58.5,"confidenza":0.974},"unita":{"valore":"kg","confidenza":0.955}},{"codice":{"valore":"PLA-1180","confidenza":0.953},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.925},"quantita":{"valore":231.0,"confidenza":0.943},"unita":{"valore":"kg","confidenza":0.923}},{"codice":{"valore":"PLA-1180","confidenza":0.992},"descrizione":{"valore":"Granulo PA6 nero","confidenza":0.964},"quantita":{"valore":345.2,"confidenza":0.911},"unita":{"valore":"kg","confidenza":0.911}}],"confidenza_minima":0.708,"stato":"da_validare"},{"file":"DDT_TECNOP_1020.pdf","pagine":1,"campi":{"fornitore":{"valore":"Tecnoplast Srl","confidenza":0.953},"partita_iva":{"valore":"IT05566778899","confidenza":0.583},"numero_ddt":{"valore":"4379/26","confidenza":0.955},"data":{"valore":"04/03/2026","confidenza":0.99},"causale":{"valore":"Campionatura","confidenza":0.961},"colli":{"valore":19,"confidenza":0.933},"peso_kg":{"valore":336.9,"confidenza":0.967}},"righe":[{"codice":{"valore":"ELE-4420","confidenza":0.926},"descrizione":{"valore":"Cavo FG16OR16 3x2,5","confidenza":0.974},"quantita":{"valore":568.5,"confidenza":0.932},"unita":{"valore":"m","confidenza":0.94}},{"codice":{"valore":"IMB-0110","confidenza":0.932},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.991},"quantita":{"valore":594.8,"confidenza":0.994},"unita":{"valore":"pz","confidenza":0.945}},{"codice":{"valore":"ACC-2050","confidenza":0.915},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.913},"quantita":{"valore":139.0,"confidenza":0.926},"unita":{"valore":"kg","confidenza":0.96}},{"codice":{"valore":"VIT-0930","confidenza":0.943},"descrizione":{"valore":"Vite TCEI M8x40","confidenza":0.979},"quantita":{"valore":432.7,"confidenza":0.924},"unita":{"valore":"pz","confidenza":0.941}}],"confidenza_minima":0.583,"stato":"da_validare"},{"file":"DDT_ELETTR_1021.pdf","pagine":1,"campi":{"fornitore":{"valore":"Elettroforniture Adriatica Srl","confidenza":0.949},"partita_iva":{"valore":"IT07788990011","confidenza":0.962},"numero_ddt":{"valore":"7254/26","confidenza":0.93},"data":{"valore":"15/03/2026","confidenza":0.987},"causale":{"valore":"Conto lavorazione","confidenza":0.931},"colli":{"valore":22,"confidenza":0.994},"peso_kg":{"valore":349.9,"confidenza":0.934}},"righe":[{"codice":{"valore":"ELE-4420","confidenza":0.968},"descrizione":{"valore":"Cavo FG16OR16 3x2,5","confidenza":0.99},"quantita":{"valore":492.9,"confidenza":0.992},"unita":{"valore":"m","confidenza":0.995}},{"codice":{"valore":"ACC-2050","confidenza":0.964},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.933},"quantita":{"valore":320.8,"confidenza":0.939},"unita":{"valore":"kg","confidenza":0.941}}],"confidenza_minima":0.93,"stato":"automatico"},{"file":"DDT_IMBALL_1022.pdf","pagine":2,"campi":{"fornitore":{"valore":"Imballaggi Verdi Srl","confidenza":0.989},"partita_iva":{"valore":"IT08899001122","confidenza":0.932},"numero_ddt":{"valore":"6353/26","confidenza":0.966},"data":{"valore":"13/03/2026","confidenza":0.987},"causale":{"valore":"Vendita","confidenza":0.915},"colli":{"valore":20,"confidenza":0.911},"peso_kg":{"valore":214.7,"confidenza":0.991}},"righe":[{"codice":{"valore":"IMB-0110","confidenza":0.947},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.955},"quantita":{"valore":237.6,"confidenza":0.914},"unita":{"valore":"pz","confidenza":0.911}},{"codice":{"valore":"ACC-2050","confidenza":0.994},"descrizione":{"valore":"Barra acciaio C45 Ø50","confidenza":0.929},"quantita":{"valore":700.0,"confidenza":0.942},"unita":{"valore":"kg","confidenza":0.987}},{"codice":{"valore":"ELE-4420","confidenza":0.972},"descrizione":{"valore":"Cavo FG16OR16 3x2,5","confidenza":0.986},"quantita":{"valore":196.2,"confidenza":0.939},"unita":{"valore":"m","confidenza":0.912}}],"confidenza_minima":0.911,"stato":"automatico"},{"file":"DDT_ACCIAI_1023.pdf","pagine":1,"campi":{"fornitore":{"valore":"Acciaierie Padane SpA","confidenza":0.986},"partita_iva":{"valore":"IT04455667788","confidenza":0.912},"numero_ddt":{"valore":"6391/26","confidenza":0.968},"data":{"valore":"11/03/2026","confidenza":0.659},"causale":{"valore":"Conto lavorazione","confidenza":0.993},"colli":{"valore":21,"confidenza":0.948},"peso_kg":{"valore":689.8,"confidenza":0.936}},"righe":[{"codice":{"valore":"IMB-0110","confidenza":0.93},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.976},"quantita":{"valore":54.5,"confidenza":0.94},"unita":{"valore":"pz","confidenza":0.925}},{"codice":{"valore":"IMB-0110","confidenza":0.927},"descrizione":{"valore":"Cartone ondulato 600x400","confidenza":0.946},"quantita":{"valore":449.3,"confidenza":0.987},"unita":{"valore":"pz","confidenza":0.924}},{"codice":{"valore":"ELE-4420","confidenza":0.984},"descrizione":{"valore":"Cavo FG16OR16 3x2,5","confidenza":0.929},"quantita":{"valore":43.6,"confidenza":0.961},"unita":{"valore":"m","confidenza":0.595}},{"codice":{"valore":"VIT-0930","confidenza":0.957},"descrizione":{"valore":"Vite TCEI M8x40","confidenza":0.979},"quantita":{"valore":274.8,"confidenza":0.951},"unita":{"valore":"pz","confidenza":0.938}}],"confidenza_minima":0.595,"stato":"da_validare"}],"riepilogo":{"documenti":24,"automatici":11,"da_validare":13,"campi_totali":408,"campi_sotto_soglia":20,"minuti_risparmiati":136.5}};
+const SOGLIA = DATA.soglia;
+let sel = 0, corretti = new Set();
+
+const ETICHETTE = {
+  fornitore: "Fornitore", partita_iva: "Partita IVA", numero_ddt: "Numero DDT",
+  data: "Data", causale: "Causale", colli: "Colli", peso_kg: "Peso (kg)"
+};
+const docs = DATA.documenti.slice().sort((a, b) => a.confidenza_minima - b.confidenza_minima);
+
+function kpis() {
+  const r = DATA.riepilogo;
+  const validati = corretti.size;
+  const cards = [
+    { l: "Documenti", v: r.documenti, d: "nel lotto" },
+    { l: "Registrati da soli", v: `${Math.round(100 * r.automatici / r.documenti)}%`, d: `${r.automatici} su ${r.documenti}` },
+    { l: "Campi da rivedere", v: `${r.campi_sotto_soglia}`, d: `su ${r.campi_totali} estratti (${(100 * r.campi_sotto_soglia / r.campi_totali).toFixed(1)}%)` },
+    { l: "Tempo risparmiato", v: `${Math.round(r.minuti_risparmiati)} min`, d: `sul lotto · ${validati} validati ora` }
+  ];
+  document.getElementById("kpis").innerHTML = cards.map(c =>
+    `<div class="card kpi"><div class="mono muted">${c.l}</div><div class="v">${c.v}</div><div class="d">${c.d}</div></div>`).join("");
+}
+
+function coda() {
+  document.getElementById("coda").innerHTML = docs.map((d, i) => {
+    const stato = corretti.has(i) ? ["t-ok", "validato"] : d.stato === "automatico" ? ["t-auto", "automatico"] : ["t-val", "da validare"];
+    return `<button class="doc" data-i="${i}" aria-current="${i === sel}">
+      <div class="r"><span class="mono">${d.file}</span><span class="tag ${stato[0]}">${stato[1]}</span></div>
+      <div class="r"><span>${d.campi.fornitore.valore}</span><span class="mono muted">min ${d.confidenza_minima.toFixed(2)}</span></div>
+    </button>`;
+  }).join("");
+  document.querySelectorAll("[data-i]").forEach(b => b.addEventListener("click", () => { sel = +b.dataset.i; render(); }));
+}
+
+function dettaglio() {
+  const d = docs[sel];
+  const campo = (chiave, c) => {
+    const dubbio = c.confidenza < SOGLIA;
+    return `<div class="campo ${dubbio ? "dubbio" : ""}">
+      <label>${ETICHETTE[chiave] || chiave}<span class="conf ${dubbio ? "bassa" : "alta"}">${(c.confidenza * 100).toFixed(1)}%</span></label>
+      <input value="${String(c.valore).replace(/"/g, "&quot;")}" ${dubbio ? "" : "readonly"}>
+    </div>`;
+  };
+  const righe = d.righe.map((r, i) => `<tr>
+    <td class="mono ${r.codice.confidenza < SOGLIA ? "" : "muted"}">${r.codice.valore}</td>
+    <td>${r.descrizione.valore}</td>
+    <td>${r.quantita.valore}</td>
+    <td class="muted">${r.unita.valore}</td>
+    <td class="mono ${Math.min(r.codice.confidenza, r.quantita.confidenza) < SOGLIA ? "" : "muted"}">${(Math.min(...Object.values(r).map(x => x.confidenza)) * 100).toFixed(0)}%</td>
+  </tr>`).join("");
+  const dubbi = Object.values(d.campi).filter(c => c.confidenza < SOGLIA).length +
+    d.righe.reduce((n, r) => n + Object.values(r).filter(c => c.confidenza < SOGLIA).length, 0);
+
+  document.getElementById("dettaglio").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <div><h2>${d.file}</h2><p class="mono muted">${d.pagine} pagina/e · ${dubbi} campi da controllare</p></div>
+      <span class="tag ${corretti.has(sel) ? "t-ok" : d.stato === "automatico" ? "t-auto" : "t-val"}">${corretti.has(sel) ? "validato" : d.stato === "automatico" ? "registrato in automatico" : "da validare"}</span>
+    </div>
+    <div class="campi">${Object.entries(d.campi).map(([k, c]) => campo(k, c)).join("")}</div>
+    <table><thead><tr><th>Codice</th><th>Descrizione</th><th>Q.tà</th><th>UM</th><th>Conf.</th></tr></thead><tbody>${righe}</tbody></table>
+    <div class="azioni">
+      <button class="btn" id="conferma">${d.stato === "automatico" ? "Già registrato" : "Conferma e registra"}</button>
+      <button class="btn ghost" id="salta">Salta</button>
+      <span class="mono muted" style="align-self:center">I campi sopra l'80% sono in sola lettura: non si rilegge quello che il modello ha già preso bene.</span>
+    </div>`;
+  document.getElementById("conferma").addEventListener("click", () => {
+    corretti.add(sel);
+    if (sel < docs.length - 1) sel++;
+    render();
+  });
+  document.getElementById("salta").addEventListener("click", () => { if (sel < docs.length - 1) sel++; render(); });
+}
+
+function render() { kpis(); coda(); dettaglio(); }
+render();
+</script>
+</body>
+</html>

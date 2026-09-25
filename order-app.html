@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d0d0f">
+<title>Gestione ordini — prototipo dell'app (demo)</title>
+<meta name="description" content="Prototipo cliccabile di un'app Power Apps per la gestione ordini, con approvazione automatica e controllo del fido.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  :root { --bg:#0d0d0f; --panel:#151518; --panel-2:#1c1c20; --line:rgba(234,230,223,.12); --ink:#eae6df; --ink-2:#8f8b84;
+    --gold:#c8a97e; --good:#8fb996; --bad:#d98c7a; --sans:"Geist","Helvetica Neue",Arial,sans-serif; --mono:"Geist Mono",ui-monospace,Menlo,monospace; color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; }
+  button, input, select, textarea { font:inherit; color:inherit; }
+  button { cursor:pointer; background:none; border:0; }
+  .mono { font-family:var(--mono); font-size:12px; } .muted { color:var(--ink-2); }
+  .wrap { max-width:1240px; margin:0 auto; padding:clamp(20px,3vw,44px); display:grid; gap:26px; }
+  h1 { margin:0; font-size:clamp(28px,3.6vw,46px); font-weight:300; letter-spacing:-.045em; line-height:1.02; }
+  .sub { margin:10px 0 0; max-width:62ch; line-height:1.55; color:var(--ink-2); }
+  .cols { display:grid; grid-template-columns:minmax(0,360px) minmax(0,1fr); gap:32px; align-items:start; }
+  /* telefono */
+  .phone { width:360px; max-width:100%; border:1px solid var(--line); border-radius:34px; background:var(--panel); padding:12px; position:sticky; top:24px; }
+  .screen { background:var(--bg); border-radius:24px; height:660px; display:flex; flex-direction:column; overflow:hidden; }
+  .bar { display:flex; justify-content:space-between; align-items:center; padding:14px 16px 10px; font-family:var(--mono); font-size:11px; color:var(--ink-2); }
+  .head { padding:4px 16px 12px; display:flex; justify-content:space-between; align-items:flex-end; gap:10px; border-bottom:1px solid var(--line); }
+  .head h2 { margin:0; font-size:20px; font-weight:400; letter-spacing:-.02em; }
+  .body { flex:1; overflow-y:auto; padding:12px 16px 16px; display:grid; gap:10px; align-content:start; }
+  .foot { padding:12px 16px 16px; border-top:1px solid var(--line); display:flex; gap:8px; }
+  .chip { padding:6px 10px; border:1px solid var(--line); border-radius:999px; font-family:var(--mono); font-size:11px; }
+  .chip.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; display:grid; gap:6px; }
+  .card:hover { border-color:var(--ink-2); }
+  .row { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+  .stato { font-family:var(--mono); font-size:10px; padding:3px 8px; border-radius:999px; white-space:nowrap; }
+  .s-app { background:rgba(143,185,150,.18); color:var(--good); }
+  .s-att { background:rgba(200,169,126,.18); color:var(--gold); }
+  .s-res { background:rgba(217,140,122,.18); color:var(--bad); }
+  .s-boz { background:rgba(143,139,132,.18); color:var(--ink-2); }
+  .btn { min-height:44px; padding:0 16px; border-radius:999px; background:var(--gold); color:#0d0d0f; font-weight:500; display:inline-flex; align-items:center; justify-content:center; gap:8px; flex:1; }
+  .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--ink); }
+  .btn:hover { filter:brightness(1.08); }
+  label { display:grid; gap:6px; font-family:var(--mono); font-size:11px; color:var(--ink-2); }
+  input, select, textarea { background:var(--panel); border:1px solid var(--line); border-radius:10px; min-height:42px; padding:0 12px; width:100%; }
+  textarea { padding:10px 12px; min-height:70px; resize:vertical; }
+  input:focus, select:focus, textarea:focus { outline:1px solid var(--gold); }
+  .totale { display:flex; justify-content:space-between; align-items:baseline; padding:12px; border:1px dashed var(--line); border-radius:12px; }
+  .totale b { font-size:26px; font-weight:300; letter-spacing:-.03em; }
+  .avviso { padding:10px 12px; border-radius:10px; font-size:13px; line-height:1.4; }
+  .avviso.err { background:rgba(217,140,122,.14); color:var(--bad); }
+  .avviso.ok { background:rgba(143,185,150,.14); color:var(--good); }
+  .avviso.warn { background:rgba(200,169,126,.14); color:var(--gold); }
+  /* pannello destro */
+  .note { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; display:grid; gap:10px; }
+  .note h3 { margin:0; font-size:17px; font-weight:500; }
+  .note p, .note li { margin:0; color:var(--ink-2); font-size:15px; line-height:1.55; }
+  .note ul { margin:0; padding-left:18px; display:grid; gap:6px; }
+  .flow { display:grid; gap:8px; }
+  .step { display:grid; grid-template-columns:28px 1fr; gap:12px; align-items:start; }
+  .step i { width:28px; height:28px; border-radius:50%; border:1px solid var(--line); display:grid; place-items:center; font-family:var(--mono); font-size:11px; font-style:normal; }
+  .step.done i { background:var(--gold); color:#0d0d0f; border-color:var(--gold); }
+  .log { font-family:var(--mono); font-size:12px; color:var(--ink-2); display:grid; gap:6px; max-height:200px; overflow:auto; }
+  .kbd { font-family:var(--mono); font-size:11px; border:1px solid var(--line); border-radius:6px; padding:2px 6px; }
+  @media (max-width:900px) { .cols { grid-template-columns:1fr; } .phone { position:static; margin:0 auto; } }
+</style>
+<style id="amir-bar-css">
+.amir-bar{position:relative;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+ padding:10px max(16px,env(safe-area-inset-left,0px));background:#0d0d0f;color:#eae6df;border-bottom:1px solid rgba(234,230,223,.12);
+ font:400 13px/1.3 Geist,'Helvetica Neue',Arial,sans-serif;letter-spacing:.01em}
+.amir-bar a{color:#eae6df;text-decoration:none;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid rgba(234,230,223,.2);border-radius:999px;transition:border-color .2s,color .2s}
+.amir-bar a:hover,.amir-bar a:focus-visible{border-color:#c8a97e;color:#c8a97e;outline:none}
+.amir-bar span{color:#8f8b84;font-family:'Geist Mono',Menlo,monospace;font-size:12px}
+.amir-bar b{font-weight:400;color:#c8a97e}
+</style>
+</head>
+<body>
+<nav class="amir-bar" aria-label="Portfolio"><a href="../index.html#/work/order-app" id="amirBack" data-it="← Torna al progetto" data-en="← Back to the project">← Torna al progetto</a><span><span id="amirName" data-it="Gestione ordini in Power Apps" data-en="Order management app">Gestione ordini in Power Apps</span> · demo</span></nav>
+<script>(function(){var l='it';try{l=localStorage.getItem('lang')||'it'}catch(e){}
+document.querySelectorAll('.amir-bar [data-'+l+']').forEach(function(el){el.textContent=el.getAttribute('data-'+l)});})();</script>
+<div class="wrap">
+  <header>
+    <p class="mono muted">Power Apps + Power Automate · prototipo cliccabile</p>
+    <h1>Gestione ordini, al posto del file Excel condiviso</h1>
+    <p class="sub">Questo è il prototipo dell'app: si può usare davvero, i dati restano nel browser. Prova a creare un ordine sopra 5.000 € o con sconto oltre il 20%: parte l'approvazione. Prova a superare il fido del cliente: l'invio viene bloccato.</p>
+  </header>
+
+  <div class="cols">
+    <div class="phone">
+      <div class="screen">
+        <div class="bar"><span id="ora">09:41</span><span>Ordini · <span id="utente">m.bianchi</span></span></div>
+        <div id="app"></div>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:14px">
+      <div class="note">
+        <h3>Cosa succede dietro</h3>
+        <div class="flow" id="flow">
+          <div class="step"><i>1</i><div><b>Invio ordine</b><p>Power Fx controlla quantità, fido residuo e soglie.</p></div></div>
+          <div class="step"><i>2</i><div><b>Regola di approvazione</b><p>Sopra 5.000 € o sconto oltre il 20% lo stato diventa <i>In approvazione</i>.</p></div></div>
+          <div class="step"><i>3</i><div><b>Flusso Power Automate</b><p>Approvazione al responsabile, notifica in Teams, sollecito dopo 48 ore.</p></div></div>
+          <div class="step"><i>4</i><div><b>Storico</b><p>Chi ha chiesto, chi ha approvato e quando restano scritti sulla riga.</p></div></div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>Registro attività</h3>
+        <p class="muted" style="font-size:13px">Le stesse voci che nel progetto reale finiscono in Teams e nella tabella Dataverse.</p>
+        <div class="log" id="log"></div>
+      </div>
+      <div class="note">
+        <h3>Prima e dopo</h3>
+        <ul>
+          <li><b>Prima:</b> un file Excel su una cartella condivisa, aperto in sola lettura quando serve, senza storico di chi ha autorizzato cosa.</li>
+          <li><b>Dopo:</b> ordini inseriti dal telefono anche in magazzino, approvazioni tracciate, fido controllato al momento dell'inserimento.</li>
+        </ul>
+        <p class="mono" style="margin-top:6px">Modello dati, formule Power Fx e definizione del flusso sono nel repository.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLIENTI = [
+  { nome: "Ferramenta Alba Srl", fido: 18000, termini: 30 },
+  { nome: "Tecno Verdi SpA", fido: 42000, termini: 60 },
+  { nome: "Metal Lombarda Srl", fido: 9000, termini: 30 },
+  { nome: "Officine Emilia SpA", fido: 55000, termini: 60 },
+  { nome: "Gruppo Sicilia Sas", fido: 6500, termini: 90 }
+];
+const ARTICOLI = [
+  { cod: "MEC-1042", desc: "Flangia in acciaio DN80", prezzo: 42.5 },
+  { cod: "ELE-3390", desc: "Quadro comandi 24V", prezzo: 612 },
+  { cod: "MEC-2251", desc: "Albero di trasmissione", prezzo: 187 },
+  { cod: "RIC-0420", desc: "Kit guarnizioni serie B", prezzo: 14.6 }
+];
+const SOGLIA_IMPORTO = 5000, SOGLIA_SCONTO = 0.20;
+const eur = v => "€ " + v.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const oggi = new Date("2026-02-10");
+const data = d => d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+let ordini = [
+  { n: "ORD-2026-1042", cliente: "Officine Emilia SpA", art: "ELE-3390", qta: 12, prezzo: 612, sconto: 0.08, stato: "Approvato", da: "m.bianchi", app: "g.rossi", data: new Date("2026-02-09") },
+  { n: "ORD-2026-1041", cliente: "Tecno Verdi SpA", art: "MEC-2251", qta: 40, prezzo: 187, sconto: 0.22, stato: "In approvazione", da: "m.bianchi", app: "", data: new Date("2026-02-09") },
+  { n: "ORD-2026-1040", cliente: "Ferramenta Alba Srl", art: "RIC-0420", qta: 120, prezzo: 14.6, sconto: 0.05, stato: "Approvato", da: "s.conti", app: "g.rossi", data: new Date("2026-02-08") },
+  { n: "ORD-2026-1039", cliente: "Metal Lombarda Srl", art: "MEC-1042", qta: 60, prezzo: 42.5, sconto: 0.31, stato: "Respinto", da: "m.bianchi", app: "g.rossi", data: new Date("2026-02-06"), motivo: "Sconto oltre il massimo concordato" }
+];
+let vista = "elenco", filtro = "Tutti", sel = null, log = [];
+const totale = o => o.qta * o.prezzo * (1 - o.sconto);
+const classe = s => ({ "Approvato": "s-app", "In approvazione": "s-att", "Respinto": "s-res" }[s] || "s-boz");
+
+function scrivi(testo) {
+  log.unshift(`${new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · ${testo}`);
+  document.getElementById("log").innerHTML = log.slice(0, 12).map(l => `<div>${l}</div>`).join("") || '<div class="muted">nessuna attività</div>';
+}
+
+function render() {
+  const app = document.getElementById("app");
+  if (vista === "elenco") {
+    const filtrati = ordini.filter(o => filtro === "Tutti" || o.stato === filtro);
+    app.innerHTML = `
+      <div class="head"><h2>Ordini</h2><span class="mono muted">${filtrati.length} righe</span></div>
+      <div class="body">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${["Tutti", "In approvazione", "Approvato", "Respinto"].map(f =>
+            `<button class="chip ${f === filtro ? "on" : ""}" data-f="${f}">${f}</button>`).join("")}
+        </div>
+        ${filtrati.map((o, i) => `
+          <button class="card" data-apri="${ordini.indexOf(o)}" style="text-align:left">
+            <div class="row"><span class="mono muted">${o.n}</span><span class="stato ${classe(o.stato)}">${o.stato}</span></div>
+            <div class="row"><b style="font-weight:400">${o.cliente}</b><span>${eur(totale(o))}</span></div>
+            <div class="row mono muted"><span>${o.art} · ${o.qta} pz · sconto ${(o.sconto * 100).toFixed(0)}%</span><span>${data(o.data)}</span></div>
+          </button>`).join("")}
+      </div>
+      <div class="foot"><button class="btn" id="nuovo">+ Nuovo ordine</button></div>`;
+  } else if (vista === "nuovo") {
+    app.innerHTML = `
+      <div class="head"><h2>Nuovo ordine</h2><button class="mono muted" id="indietro">← indietro</button></div>
+      <div class="body">
+        <label>Cliente<select id="cliente">${CLIENTI.map(c => `<option value="${c.nome}">${c.nome}</option>`).join("")}</select></label>
+        <div class="mono muted" id="fido"></div>
+        <label>Articolo<select id="articolo">${ARTICOLI.map(a => `<option value="${a.cod}">${a.cod} — ${a.desc}</option>`).join("")}</select></label>
+        <label>Quantità<input id="qta" type="number" min="1" value="10"></label>
+        <label>Prezzo unitario<input id="prezzo" type="number" step="0.01" value="612"></label>
+        <label>Sconto: <span id="scontoVal">10%</span><input id="sconto" type="range" min="0" max="40" value="10" style="padding:0"></label>
+        <label>Note<textarea id="note" placeholder="Consegna richiesta, riferimenti..."></textarea></label>
+        <div class="totale"><span class="mono muted">Totale</span><b id="tot">€ 0,00</b></div>
+        <div id="avviso"></div>
+      </div>
+      <div class="foot"><button class="btn ghost" id="annulla">Annulla</button><button class="btn" id="invia">Invia</button></div>`;
+    aggiornaForm();
+  } else if (vista === "dettaglio") {
+    const o = ordini[sel];
+    app.innerHTML = `
+      <div class="head"><h2>${o.n}</h2><button class="mono muted" id="indietro">← indietro</button></div>
+      <div class="body">
+        <div class="card">
+          <div class="row"><span class="mono muted">Stato</span><span class="stato ${classe(o.stato)}">${o.stato}</span></div>
+          <div class="row"><span class="mono muted">Cliente</span><span>${o.cliente}</span></div>
+          <div class="row"><span class="mono muted">Articolo</span><span>${o.art}</span></div>
+          <div class="row"><span class="mono muted">Quantità</span><span>${o.qta}</span></div>
+          <div class="row"><span class="mono muted">Prezzo</span><span>${eur(o.prezzo)}</span></div>
+          <div class="row"><span class="mono muted">Sconto</span><span>${(o.sconto * 100).toFixed(0)}%</span></div>
+          <div class="row"><span class="mono muted">Totale</span><b style="font-weight:400">${eur(totale(o))}</b></div>
+        </div>
+        <div class="card">
+          <div class="row"><span class="mono muted">Richiesto da</span><span>${o.da}</span></div>
+          <div class="row"><span class="mono muted">Approvato da</span><span>${o.app || "—"}</span></div>
+          <div class="row"><span class="mono muted">Data</span><span>${data(o.data)}</span></div>
+          ${o.motivo ? `<div class="avviso err">${o.motivo}</div>` : ""}
+        </div>
+        ${o.stato === "In approvazione" ? `
+          <div class="avviso warn">In attesa del responsabile commerciale. Nel prototipo puoi decidere tu.</div>
+          <div style="display:flex;gap:8px"><button class="btn ghost" id="respingi">Respingi</button><button class="btn" id="approva">Approva</button></div>` : ""}
+      </div>
+      <div class="foot"><button class="btn ghost" id="torna">Torna all'elenco</button></div>`;
+  }
+  collega();
+}
+
+function aggiornaForm() {
+  const cliente = CLIENTI.find(c => c.nome === document.getElementById("cliente").value);
+  const qta = +document.getElementById("qta").value || 0;
+  const prezzo = +document.getElementById("prezzo").value || 0;
+  const sconto = +document.getElementById("sconto").value / 100;
+  const tot = qta * prezzo * (1 - sconto);
+  document.getElementById("scontoVal").textContent = (sconto * 100).toFixed(0) + "%";
+  document.getElementById("tot").textContent = eur(tot);
+  document.getElementById("fido").textContent = `fido residuo ${eur(cliente.fido)} · pagamento ${cliente.termini} gg`;
+  const av = document.getElementById("avviso");
+  if (tot > cliente.fido) av.innerHTML = `<div class="avviso err">Supera il fido residuo di ${eur(cliente.fido)}: l'invio è bloccato.</div>`;
+  else if (tot > SOGLIA_IMPORTO || sconto > SOGLIA_SCONTO) av.innerHTML = `<div class="avviso warn">Serve l'approvazione del responsabile: ${tot > SOGLIA_IMPORTO ? "importo sopra " + eur(SOGLIA_IMPORTO) : "sconto sopra il 20%"}.</div>`;
+  else av.innerHTML = `<div class="avviso ok">Sotto le soglie: viene registrato subito come approvato.</div>`;
+}
+
+function collega() {
+  const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+  document.querySelectorAll("[data-f]").forEach(b => b.addEventListener("click", () => { filtro = b.dataset.f; render(); }));
+  document.querySelectorAll("[data-apri]").forEach(b => b.addEventListener("click", () => { sel = +b.dataset.apri; vista = "dettaglio"; render(); }));
+  on("nuovo", "click", () => { vista = "nuovo"; render(); });
+  on("indietro", "click", () => { vista = "elenco"; render(); });
+  on("torna", "click", () => { vista = "elenco"; render(); });
+  on("annulla", "click", () => { vista = "elenco"; render(); });
+  ["cliente", "qta", "prezzo", "sconto", "articolo"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("input", () => {
+      if (id === "articolo") {
+        const a = ARTICOLI.find(x => x.cod === el.value);
+        document.getElementById("prezzo").value = a.prezzo;
+      }
+      aggiornaForm();
+    });
+  });
+  on("invia", "click", () => {
+    const cliente = CLIENTI.find(c => c.nome === document.getElementById("cliente").value);
+    const qta = +document.getElementById("qta").value || 0;
+    const prezzo = +document.getElementById("prezzo").value || 0;
+    const sconto = +document.getElementById("sconto").value / 100;
+    const art = document.getElementById("articolo").value;
+    const tot = qta * prezzo * (1 - sconto);
+    if (qta <= 0) { scrivi("Invio rifiutato: quantità non valida"); return; }
+    if (tot > cliente.fido) { scrivi(`Invio bloccato: ${eur(tot)} oltre il fido di ${cliente.nome}`); return; }
+    const serve = tot > SOGLIA_IMPORTO || sconto > SOGLIA_SCONTO;
+    const n = "ORD-2026-" + (1043 + ordini.length);
+    ordini.unshift({ n, cliente: cliente.nome, art, qta, prezzo, sconto, stato: serve ? "In approvazione" : "Approvato", da: "m.bianchi", app: serve ? "" : "automatico", data: oggi });
+    scrivi(`${n} creato · ${eur(tot)} · ${serve ? "inviato in approvazione a g.rossi" : "approvato automaticamente"}`);
+    if (serve) scrivi(`Teams: notifica a g.rossi, sollecito programmato tra 48 h`);
+    vista = "elenco"; filtro = "Tutti"; render();
+  });
+  on("approva", "click", () => {
+    ordini[sel].stato = "Approvato"; ordini[sel].app = "g.rossi";
+    scrivi(`${ordini[sel].n} approvato da g.rossi · mail di conferma al cliente`);
+    render();
+  });
+  on("respingi", "click", () => {
+    ordini[sel].stato = "Respinto"; ordini[sel].app = "g.rossi"; ordini[sel].motivo = "Sconto oltre il massimo concordato";
+    scrivi(`${ordini[sel].n} respinto da g.rossi · notifica al richiedente`);
+    render();
+  });
+}
+
+scrivi("App avviata · utente m.bianchi · 4 ordini caricati");
+render();
+</script>
+</body>
+</html>

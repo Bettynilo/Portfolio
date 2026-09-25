@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d0d0f">
+<title>Revenue management hotel — Venezia (demo)</title>
+<meta name="description" content="Demo: cruscotto di revenue management per un hotel veneziano fittizio. Occupazione, ADR, RevPAR, pickup, canali al netto delle commissioni e prezzi consigliati. Dati sintetici.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  :root { --bg:#0d0d0f; --panel:#151518; --line:rgba(234,230,223,.12); --ink:#eae6df; --ink-2:#8f8b84; --gold:#c8a97e; --good:#8fb996; --bad:#d98c7a;
+    --sans:"Geist","Helvetica Neue",Arial,sans-serif; --mono:"Geist Mono",ui-monospace,Menlo,monospace; color-scheme: dark; }
+  :root[data-theme="light"] { --bg:#e4e4e0; --panel:#edece8; --line:rgba(13,13,15,.14); --ink:#0d0d0f; --ink-2:#57564f; --gold:#8c6a3a; --good:#2e6b4f; --bad:#a64b36; color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; }
+  button, select { font:inherit; color:inherit; cursor:pointer; }
+  .mono { font-family:var(--mono); font-size:12px; } .muted { color:var(--ink-2); }
+  .wrap { max-width:1320px; margin:0 auto; padding:clamp(20px,3vw,44px); display:grid; gap:22px; }
+  header.top { display:flex; flex-wrap:wrap; gap:18px; justify-content:space-between; align-items:flex-end; }
+  h1 { margin:0; font-size:clamp(30px,4vw,50px); font-weight:300; letter-spacing:-.045em; line-height:1; }
+  .sub { margin:10px 0 0; max-width:64ch; line-height:1.5; }
+  .ctrl { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn, select { background:var(--panel); border:1px solid var(--line); border-radius:999px; min-height:42px; padding:0 16px; }
+  .btn:hover, select:hover { border-color:var(--ink-2); }
+  .grid { display:grid; gap:14px; }
+  .kpis { grid-template-columns:repeat(5,minmax(0,1fr)); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; min-width:0; }
+  .kpi .v { font-size:clamp(26px,2.6vw,38px); font-weight:300; letter-spacing:-.04em; margin-top:8px; line-height:1; font-variant-numeric:tabular-nums; }
+  .kpi .d { margin-top:8px; font-size:12px; font-family:var(--mono); }
+  .up { color:var(--good); } .down { color:var(--bad); }
+  .two { grid-template-columns:minmax(0,2fr) minmax(0,1fr); }
+  .half { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  h2 { margin:0 0 4px; font-size:17px; font-weight:500; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin:8px 0 12px; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-family:var(--mono); color:var(--ink-2); }
+  .legend i { width:10px; height:10px; border-radius:2px; }
+  svg { display:block; width:100%; height:auto; overflow:visible; }
+  svg text { font-family:var(--mono); font-size:11px; fill:var(--ink-2); }
+  .bar-row { display:grid; grid-template-columns:1fr auto; gap:6px 12px; align-items:center; padding:9px 0; border-top:1px solid var(--line); font-size:14px; }
+  .bar-row:first-of-type { border-top:0; }
+  .bar { grid-column:1/-1; height:5px; background:var(--line); border-radius:3px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--gold); }
+  .tw { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; font-variant-numeric:tabular-nums; }
+  th, td { text-align:right; padding:9px 6px; border-top:1px solid var(--line); white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; }
+  th { font-family:var(--mono); font-size:11px; font-weight:400; color:var(--ink-2); text-transform:uppercase; letter-spacing:.04em; }
+  tbody tr:hover { background:rgba(200,169,126,.07); }
+  .tag { display:inline-block; font-family:var(--mono); font-size:11px; padding:3px 9px; border-radius:999px; }
+  .t-up { background:rgba(143,185,150,.14); color:var(--good); } .t-down { background:rgba(217,140,122,.14); color:var(--bad); } .t-hold { background:var(--line); color:var(--ink-2); }
+  .insight { border-left:2px solid var(--gold); padding:4px 0 4px 14px; margin:14px 0 0; line-height:1.55; font-size:14px; }
+  footer { color:var(--ink-2); font-size:13px; line-height:1.6; border-top:1px solid var(--line); padding-top:18px; }
+  .note { display:inline-flex; gap:8px; align-items:center; padding:8px 14px; border:1px dashed var(--line); border-radius:999px; font-size:12px; font-family:var(--mono); }
+  .pipe { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:12px; font-family:var(--mono); font-size:12px; }
+  .pipe span { padding:8px 12px; border:1px solid var(--line); border-radius:8px; }
+  .pipe b { color:var(--gold); font-weight:400; }
+  @media (max-width:1000px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} .two,.half{grid-template-columns:1fr;} }
+</style>
+<style id="amir-bar-css">
+.amir-bar{position:relative;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+ padding:10px max(16px,env(safe-area-inset-left,0px));background:#0d0d0f;color:#eae6df;border-bottom:1px solid rgba(234,230,223,.12);
+ font:400 13px/1.3 Geist,'Helvetica Neue',Arial,sans-serif;letter-spacing:.01em}
+.amir-bar a{color:#eae6df;text-decoration:none;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid rgba(234,230,223,.2);border-radius:999px;transition:border-color .2s,color .2s}
+.amir-bar a:hover,.amir-bar a:focus-visible{border-color:#c8a97e;color:#c8a97e;outline:none}
+.amir-bar span{color:#8f8b84;font-family:'Geist Mono',Menlo,monospace;font-size:12px}
+.amir-bar b{font-weight:400;color:#c8a97e}
+</style>
+</head>
+<body>
+<nav class="amir-bar" aria-label="Portfolio"><a href="../index.html#/work/hotel-revenue" id="amirBack" data-it="← Torna al progetto" data-en="← Back to the project">← Torna al progetto</a><span><span id="amirName" data-it="Revenue management hotel" data-en="Hotel revenue management">Revenue management hotel</span> · demo</span></nav>
+<script>(function(){var l='it';try{l=localStorage.getItem('lang')||'it'}catch(e){}
+document.querySelectorAll('.amir-bar [data-'+l+']').forEach(function(el){el.textContent=el.getAttribute('data-'+l)});})();</script>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="mono muted" data-t="eyebrow">Hotel Fondamenta · 84 camere · Venezia · hotel fittizio, dati sintetici</p>
+      <h1 data-t="title">Revenue management, ogni mattina</h1>
+      <p class="sub muted" data-t="sub">Il cruscotto che un revenue manager apre alle 8: quanto abbiamo venduto, a che prezzo, cosa entra per le prossime settimane rispetto all'anno scorso e quanto resta davvero in cassa dopo le commissioni dei portali.</p>
+      <div class="pipe"><span>PMS · <b>prenotazioni</b></span><span>→</span><span>channel manager</span><span>→</span><span>modello a stella</span><span>→</span><span><b>Power BI</b></span></div>
+    </div>
+    <div class="ctrl">
+      <label class="mono muted" for="period" style="position:absolute;left:-9999px">Periodo</label>
+      <select id="period"></select>
+      <button class="btn" id="lang">EN</button><button class="btn" id="theme" aria-label="Tema">◐</button>
+    </div>
+  </header>
+
+  <section class="grid kpis" id="kpis"></section>
+
+  <section class="grid two">
+    <div class="card">
+      <h2 id="perfTitle"></h2>
+      <p class="mono muted" id="perfSub"></p>
+      <div class="legend"><span><i style="background:var(--gold)"></i><span id="lgBar"></span></span><span><i style="background:var(--ink)"></i><span data-t="occ">Occupazione %</span></span></div>
+      <svg id="perf" viewBox="0 0 800 300" role="img" aria-label="Andamento"></svg>
+    </div>
+    <div class="card">
+      <h2 data-t="chTitle">Canali, al netto delle commissioni</h2>
+      <p class="mono muted" data-t="chSub">Quanto resta per camera venduta</p>
+      <div id="channels" style="margin-top:12px"></div>
+      <p class="insight" id="chInsight"></p>
+    </div>
+  </section>
+
+  <section class="grid half">
+    <div class="card">
+      <h2 data-t="paceTitle">Pickup: prossime 13 settimane</h2>
+      <p class="mono muted" id="paceSub"></p>
+      <div class="legend"><span><i style="background:var(--gold)"></i><span data-t="otb">In portafoglio oggi</span></span><span><i style="background:var(--ink-2)"></i><span data-t="stly">Stesso giorno anno scorso</span></span></div>
+      <svg id="pace" viewBox="0 0 800 280" role="img" aria-label="Pickup"></svg>
+      <p class="insight" id="paceInsight"></p>
+    </div>
+    <div class="card">
+      <h2 data-t="leadTitle">Con quanto anticipo prenotano</h2>
+      <p class="mono muted" data-t="leadSub">Quota di notti per giorni di anticipo, ultimi 12 mesi</p>
+      <div id="lead" style="margin-top:12px"></div>
+      <p class="insight" id="leadInsight"></p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 data-t="recTitle">Prezzi consigliati per i prossimi 14 giorni</h2>
+    <p class="mono muted" data-t="recSub">Regola: previsione di occupazione = portafoglio di oggi + pickup atteso dallo storico. Sopra il 90% si alza, sotto il 65% si abbassa o si apre un'offerta sul sito.</p>
+    <div class="tw" style="margin-top:10px"><table id="rec"></table></div>
+  </section>
+
+  <footer>
+    <span class="note" data-t="seed">Dati sintetici generati in JavaScript · seed 20260922 · oggi = 22/09/2026</span>
+    <p data-t="footer">Progetto dimostrativo di Betty. In Power BI lo stesso modello usa una tabella dei fatti delle notti vendute (data soggiorno, data prenotazione, canale, prezzo, commissione) e una tabella di snapshot giornaliera del portafoglio per il pickup. Le misure DAX principali: occupazione, ADR, RevPAR, RevPAR netto, pickup a 7 giorni e confronto con lo stesso giorno dell'anno precedente. Le date degli eventi sono indicative.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // ---------- seeded data ----------
+  let seed = 20260922;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  const gauss = () => { let u = 0; for (let i = 0; i < 6; i++) u += rnd(); return u - 3; };
+  const ROOMS = 84, DAY = 86400000;
+  const TODAY = new Date(Date.UTC(2026, 8, 22));
+  const iso = d => d.toISOString().slice(0, 10);
+  const addD = (d, n) => new Date(d.getTime() + n * DAY);
+  const SEASON = [0.52, 0.78, 0.74, 0.9, 1.0, 1.04, 1.0, 0.94, 1.04, 0.95, 0.6, 0.72];
+  const EVENTS = [
+    { from: "2026-02-07", to: "2026-02-17", it: "Carnevale", en: "Carnival", k: 1.35 },
+    { from: "2026-07-17", to: "2026-07-19", it: "Redentore", en: "Redentore", k: 1.3 },
+    { from: "2026-08-26", to: "2026-09-05", it: "Mostra del Cinema", en: "Film Festival", k: 1.25 },
+    { from: "2026-09-05", to: "2026-09-06", it: "Regata Storica", en: "Historical Regatta", k: 1.15 },
+    { from: "2025-12-30", to: "2026-01-01", it: "Capodanno", en: "New Year", k: 1.4 },
+    { from: "2026-12-30", to: "2027-01-01", it: "Capodanno", en: "New Year", k: 1.4 }
+  ];
+  const evOf = s => EVENTS.find(e => s >= e.from && s <= e.to);
+  const CH = [
+    { id: "direct", it: "Sito diretto", en: "Direct website", share: .22, comm: .03, adr: 1.04 },
+    { id: "booking", it: "Booking.com", en: "Booking.com", share: .38, comm: .17, adr: 1.0 },
+    { id: "expedia", it: "Expedia", en: "Expedia", share: .13, comm: .18, adr: 1.0 },
+    { id: "to", it: "Tour operator", en: "Tour operators", share: .14, comm: .25, adr: .96 },
+    { id: "corp", it: "Aziende / GDS", en: "Corporate / GDS", share: .08, comm: .10, adr: .9 },
+    { id: "phone", it: "Telefono / email", en: "Phone / email", share: .05, comm: 0, adr: 1.02 }
+  ];
+  const LEAD = [[0, 3], [4, 7], [8, 14], [15, 30], [31, 60], [61, 90], [91, 180]];
+  const LEADW = [.08, .1, .15, .24, .22, .12, .09];
+  const DOW = [0.92, 0.9, 0.93, 0.98, 1.06, 1.12, 0.97]; // Sun..Sat
+
+  function dayModel(d, yearShift) {
+    const s = iso(d), m = d.getUTCMonth(), w = d.getUTCDay(), ev = evOf(s);
+    let occ = 0.83 * SEASON[m] * DOW[w] * (ev ? Math.min(1.25, ev.k) : 1) + gauss() * 0.035 + yearShift;
+    occ = Math.max(0.28, Math.min(1, occ));
+    let adr = 205 * Math.pow(SEASON[m], 1.35) * (0.9 + 0.1 * DOW[w] * 1.05) * (ev ? ev.k : 1) * (1 + gauss() * 0.03) * (1 + yearShift * 0.8);
+    return { occ, adr, ev };
+  }
+  // history: last 12 months actuals (stay dates < today)
+  const HIST = [];
+  for (let d = addD(TODAY, -365); d < TODAY; d = addD(d, 1)) {
+    const m = dayModel(d, 0.0), sold = Math.round(m.occ * ROOMS);
+    const byCh = CH.map(c => {
+      const r = Math.max(0, Math.round(sold * c.share * (1 + gauss() * 0.12)));
+      return { r, adr: m.adr * c.adr * (1 + gauss() * 0.02) };
+    });
+    const tot = byCh.reduce((a, b) => a + b.r, 0);
+    const lead = LEADW.map(w => w * (1 + gauss() * 0.1));
+    HIST.push({ d, s: iso(d), sold: tot, rev: byCh.reduce((a, b, i) => a + b.r * b.adr, 0), net: byCh.reduce((a, b, i) => a + b.r * b.adr * (1 - CH[i].comm), 0), byCh, lead, ev: m.ev });
+  }
+  // forward 91 days: final expectation, on-the-books today, same-time-last-year
+  const pickupShare = lead => { // share of final nights already booked when `lead` days remain
+    let done = 0; LEAD.forEach((b, i) => { if (b[0] > lead) done += LEADW[i]; else if (b[1] >= lead) done += LEADW[i] * (b[1] - lead) / (b[1] - b[0] + 1); });
+    return Math.min(1, done);
+  };
+  const FWD = [];
+  for (let i = 1; i <= 91; i++) {
+    const d = addD(TODAY, i), m = dayModel(d, 0.0);
+    const drift = i > 35 && i < 70 ? -0.09 : (i <= 21 ? 0.05 : 0.0); // behind last year in late Oct–Nov
+    const finalLY = Math.min(1, m.occ * (1 + gauss() * 0.03));
+    const share = pickupShare(i);
+    const otb = Math.max(0, Math.min(ROOMS, Math.round(ROOMS * finalLY * share * (1 + drift + gauss() * 0.04))));
+    const stly = Math.max(0, Math.min(ROOMS, Math.round(ROOMS * finalLY * share * (1 + gauss() * 0.03))));
+    const fcst = Math.min(ROOMS, Math.round(otb + ROOMS * finalLY * (1 - share) * (1 + drift * 0.6)));
+    FWD.push({ d, s: iso(d), otb, stly, fcst, adrNow: m.adr, ev: m.ev });
+  }
+
+  // ---------- i18n ----------
+  const T = {
+    it: { eyebrow: "Hotel Fondamenta · 84 camere · Venezia · hotel fittizio, dati sintetici", title: "Revenue management, ogni mattina",
+      sub: "Il cruscotto che un revenue manager apre alle 8: quanto abbiamo venduto, a che prezzo, cosa entra per le prossime settimane rispetto all'anno scorso e quanto resta davvero in cassa dopo le commissioni dei portali.",
+      occ: "Occupazione %", chTitle: "Canali, al netto delle commissioni", chSub: "Quanto resta per camera venduta", paceTitle: "Pickup: prossime 13 settimane",
+      otb: "In portafoglio oggi", stly: "Stesso giorno anno scorso", leadTitle: "Con quanto anticipo prenotano", leadSub: "Quota di notti per giorni di anticipo, ultimi 12 mesi",
+      recTitle: "Prezzi consigliati per i prossimi 14 giorni", recSub: "Regola: previsione di occupazione = portafoglio di oggi + pickup atteso dallo storico. Sopra il 90% si alza, sotto il 65% si abbassa o si apre un'offerta sul sito.",
+      seed: "Dati sintetici generati in JavaScript · seed 20260922 · oggi = 22/09/2026",
+      footer: "Progetto dimostrativo di Betty. In Power BI lo stesso modello usa una tabella dei fatti delle notti vendute (data soggiorno, data prenotazione, canale, prezzo, commissione) e una tabella di snapshot giornaliera del portafoglio per il pickup. Le misure DAX principali: occupazione, ADR, RevPAR, RevPAR netto, pickup a 7 giorni e confronto con lo stesso giorno dell'anno precedente. Le date degli eventi sono indicative.",
+      all: "Ultimi 12 mesi", kOcc: "Occupazione", kAdr: "ADR", kRevpar: "RevPAR", kNet: "RevPAR netto", kPick: "Pickup 7 giorni",
+      dOcc: n => `${n} notti vendute`, dAdr: "prezzo medio per camera", dRevpar: "ricavo per camera disponibile", dNet: p => `dopo ${p} di commissioni`, dPick: n => `notti prenotate, prossimi 90 gg · ${n} vs anno scorso`,
+      perf12: "Mese per mese", perfM: "Giorno per giorno", sub12: "RevPAR mensile e occupazione", subM: "ADR giornaliero e occupazione", lgRevpar: "RevPAR €", lgAdr: "ADR €",
+      paceSub: "Notti in portafoglio per settimana di soggiorno", nights: "notti", colCh: ["Canale", "Notti", "Quota", "ADR", "Comm.", "Netto/notte"],
+      colRec: ["Data", "Evento", "Portafoglio", "Anno scorso", "Previsione", "Prezzo oggi", "Consiglio", "Nuovo prezzo"],
+      up: "Alzare", down: "Abbassare", hold: "Tenere", months: ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"], days: ["dom", "lun", "mar", "mer", "gio", "ven", "sab"],
+      chIns: (a, b, c, v) => `Booking.com porta il ${a} delle notti, ma dopo il 17% di commissione ogni notte rende ${b} contro ${c} dal sito diretto. Spostare 5 punti di quota sul diretto vale circa ${v} l'anno, senza vendere una camera in più.`,
+      paceIns: (w, g) => `Le settimane dal ${w} sono indietro di ${g} notti rispetto all'anno scorso alla stessa data: è lì che serve un'azione adesso, non a novembre.`,
+      leadIns: p => `Il ${p} delle notti arriva con meno di due settimane di anticipo: il prezzo delle ultime due settimane è la leva più forte, per questo il consiglio sotto guarda 14 giorni.`,
+      why: { up: "domanda forte", down: "sotto il ritmo", hold: "in linea" } },
+    en: { eyebrow: "Hotel Fondamenta · 84 rooms · Venice · fictional hotel, synthetic data", title: "Revenue management, every morning",
+      sub: "The dashboard a revenue manager opens at 8am: what we sold, at what price, what's coming in for the next weeks against last year, and how much actually stays after the booking sites take their commission.",
+      occ: "Occupancy %", chTitle: "Channels, net of commission", chSub: "What stays per room sold", paceTitle: "Pickup: next 13 weeks",
+      otb: "On the books today", stly: "Same time last year", leadTitle: "How far ahead guests book", leadSub: "Share of nights by days booked ahead, last 12 months",
+      recTitle: "Suggested prices for the next 14 days", recSub: "Rule: occupancy forecast = on the books today + expected pickup from history. Above 90% raise, below 65% lower or open a direct-website offer.",
+      seed: "Synthetic data generated in JavaScript · seed 20260922 · today = 22/09/2026",
+      footer: "Demo project by Betty. In Power BI the same model uses a fact table of room nights sold (stay date, booking date, channel, price, commission) and a daily snapshot table of the books for pickup. Main DAX measures: occupancy, ADR, RevPAR, net RevPAR, 7-day pickup and same-time-last-year comparison. Event dates are indicative.",
+      all: "Last 12 months", kOcc: "Occupancy", kAdr: "ADR", kRevpar: "RevPAR", kNet: "Net RevPAR", kPick: "7-day pickup",
+      dOcc: n => `${n} room nights sold`, dAdr: "average price per room", dRevpar: "revenue per available room", dNet: p => `after ${p} commission`, dPick: n => `nights booked, next 90 days · ${n} vs last year`,
+      perf12: "Month by month", perfM: "Day by day", sub12: "Monthly RevPAR and occupancy", subM: "Daily ADR and occupancy", lgRevpar: "RevPAR €", lgAdr: "ADR €",
+      paceSub: "Nights on the books by week of stay", nights: "nights", colCh: ["Channel", "Nights", "Share", "ADR", "Comm.", "Net/night"],
+      colRec: ["Date", "Event", "On books", "Last year", "Forecast", "Price today", "Advice", "New price"],
+      up: "Raise", down: "Lower", hold: "Hold", months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+      chIns: (a, b, c, v) => `Booking.com brings ${a} of nights, but after its 17% commission each night earns ${b} against ${c} from the direct website. Moving 5 points of share to direct is worth about ${v} a year, without selling a single extra room.`,
+      paceIns: (w, g) => `The weeks from ${w} are ${g} nights behind last year at the same date: that's where action is needed now, not in November.`,
+      leadIns: p => `${p} of nights are booked less than two weeks ahead: the price in the last two weeks is the strongest lever, which is why the advice below looks 14 days out.`,
+      why: { up: "strong demand", down: "behind pace", hold: "on track" } }
+  };
+  let L = "it";
+  const t = () => T[L];
+  const loc = () => L === "it" ? "it-IT" : "en-GB";
+  const eur = (v, dp = 0) => "€ " + v.toLocaleString(loc(), { maximumFractionDigits: dp, minimumFractionDigits: dp });
+  const pct = (v, dp = 1) => (v * 100).toLocaleString(loc(), { maximumFractionDigits: dp, minimumFractionDigits: dp }) + "%";
+  const num = v => Math.round(v).toLocaleString(loc());
+  const dstr = d => `${t().days[d.getUTCDay()]} ${d.getUTCDate()} ${t().months[d.getUTCMonth()]}`;
+
+  // ---------- period ----------
+  const periods = [{ k: "all" }];
+  for (let i = 11; i >= 0; i--) { const d = new Date(Date.UTC(2026, 8 - i, 1)); periods.push({ k: iso(d).slice(0, 7), y: d.getUTCFullYear(), m: d.getUTCMonth() }); }
+  const sel = document.getElementById("period");
+  let period = "all";
+  function fillPeriods() {
+    sel.innerHTML = periods.map(p => `<option value="${p.k}"${p.k === period ? " selected" : ""}>${p.k === "all" ? t().all : t().months[p.m] + " " + p.y}</option>`).join("");
+  }
+  sel.addEventListener("change", () => { period = sel.value; render(); });
+
+  const agg = rows => {
+    const sold = rows.reduce((a, r) => a + r.sold, 0), rev = rows.reduce((a, r) => a + r.rev, 0), net = rows.reduce((a, r) => a + r.net, 0);
+    const avail = rows.length * ROOMS;
+    return { sold, rev, net, occ: sold / avail, adr: rev / sold, revpar: rev / avail, netpar: net / avail };
+  };
+
+  // ---------- render ----------
+  const svgNS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, text) { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
+
+  function kpis(rows) {
+    const a = agg(rows), comm = 1 - a.net / a.rev;
+    const pick7 = FWD.reduce((s, f) => s + f.otb, 0), stly = FWD.reduce((s, f) => s + f.stly, 0), diff = pick7 - stly;
+    // 7-day pickup: approximate as nights added in the last 7 days on the forward window
+    const added = Math.round(FWD.reduce((s, f, i) => s + (f.otb - Math.round(f.otb * pickupShare(i + 8) / Math.max(0.01, pickupShare(i + 1)))), 0));
+    const k = [
+      [t().kOcc, pct(a.occ), t().dOcc(num(a.sold)), ""],
+      [t().kAdr, eur(a.adr), t().dAdr, ""],
+      [t().kRevpar, eur(a.revpar), t().dRevpar, ""],
+      [t().kNet, eur(a.netpar), t().dNet(pct(comm)), ""],
+      [t().kPick, "+" + num(added), t().dPick((diff >= 0 ? "+" : "") + num(diff)), diff >= 0 ? "up" : "down"]
+    ];
+    document.getElementById("kpis").innerHTML = k.map(x => `<div class="card kpi"><div class="mono muted">${x[0]}</div><div class="v">${x[1]}</div><div class="d ${x[3]}">${x[2]}</div></div>`).join("");
+  }
+
+  function perf(rows) {
+    const svg = document.getElementById("perf"); svg.innerHTML = "";
+    const W = 800, H = 300, l = 54, r = 44, top = 14, b = 30, iw = W - l - r, ih = H - top - b;
+    let pts;
+    if (period === "all") {
+      pts = periods.slice(1).map(p => { const rs = rows.filter(x => x.s.startsWith(p.k)); const a = agg(rs); return { lab: t().months[p.m], bar: a.revpar, occ: a.occ, ev: null }; });
+      document.getElementById("perfTitle").textContent = t().perf12; document.getElementById("perfSub").textContent = t().sub12; document.getElementById("lgBar").textContent = t().lgRevpar;
+    } else {
+      pts = rows.map(x => ({ lab: String(x.d.getUTCDate()), bar: x.rev / Math.max(1, x.sold), occ: x.sold / ROOMS, ev: x.ev }));
+      document.getElementById("perfTitle").textContent = t().perfM; document.getElementById("perfSub").textContent = t().subM; document.getElementById("lgBar").textContent = t().lgAdr;
+    }
+    const maxB = Math.ceil(Math.max(...pts.map(p => p.bar)) / 50) * 50;
+    for (let i = 0; i <= 4; i++) {
+      const y = top + ih - ih * i / 4;
+      svg.appendChild(el("line", { x1: l, x2: W - r, y1: y, y2: y, stroke: "var(--line)" }));
+      svg.appendChild(el("text", { x: l - 8, y: y + 4, "text-anchor": "end" }, "€ " + Math.round(maxB * i / 4)));
+      svg.appendChild(el("text", { x: W - r + 8, y: y + 4 }, (25 * i) + "%"));
+    }
+    const bw = iw / pts.length;
+    pts.forEach((p, i) => {
+      const h = ih * p.bar / maxB, x = l + i * bw;
+      const rect = el("rect", { x: x + bw * 0.18, y: top + ih - h, width: Math.max(1, bw * 0.64), height: h, fill: "var(--gold)", rx: 1.5, opacity: p.ev ? 1 : 0.8 });
+      rect.appendChild(el("title", {}, `${p.lab} · ${eur(p.bar)} · ${pct(p.occ)}${p.ev ? " · " + p.ev[L] : ""}`));
+      svg.appendChild(rect);
+      const step = pts.length > 14 ? 5 : 1;
+      if (i % step === 0) svg.appendChild(el("text", { x: x + bw / 2, y: H - 8, "text-anchor": "middle" }, p.lab));
+      if (p.ev && (i === 0 || !pts[i - 1].ev)) svg.appendChild(el("text", { x: x + bw / 2, y: top + ih - h - 8, "text-anchor": "start", style: "fill:var(--gold)" }, p.ev[L]));
+    });
+    const line = pts.map((p, i) => `${i ? "L" : "M"}${(l + i * bw + bw / 2).toFixed(1)},${(top + ih - ih * p.occ).toFixed(1)}`).join("");
+    svg.appendChild(el("path", { d: line, fill: "none", stroke: "var(--ink)", "stroke-width": 1.6 }));
+    pts.forEach((p, i) => svg.appendChild(el("circle", { cx: l + i * bw + bw / 2, cy: top + ih - ih * p.occ, r: pts.length > 14 ? 1.6 : 3, fill: "var(--ink)" })));
+  }
+
+  function channels(rows) {
+    const tot = rows.reduce((a, r) => a + r.sold, 0);
+    const c = CH.map((ch, i) => {
+      const n = rows.reduce((a, r) => a + r.byCh[i].r, 0), rev = rows.reduce((a, r) => a + r.byCh[i].r * r.byCh[i].adr, 0);
+      return { ch, n, share: n / tot, adr: rev / n, net: rev / n * (1 - ch.comm) };
+    });
+    const maxNet = Math.max(...c.map(x => x.net));
+    document.getElementById("channels").innerHTML = c.sort((a, b) => b.net - a.net).map(x =>
+      `<div class="bar-row"><span>${x.ch[L]} <span class="mono muted">· ${pct(x.share, 0)} · ${x.ch.comm ? "−" + pct(x.ch.comm, 0) : "0%"}</span></span><span class="mono">${eur(x.net)}</span><div class="bar"><i style="width:${(x.net / maxNet * 100).toFixed(1)}%"></i></div></div>`).join("");
+    const bk = c.find(x => x.ch.id === "booking"), dr = c.find(x => x.ch.id === "direct");
+    const nightsYear = agg(HIST).sold, gain = nightsYear * 0.05 * (dr.net - bk.net);
+    document.getElementById("chInsight").textContent = t().chIns(pct(bk.share, 0), eur(bk.net), eur(dr.net), eur(Math.round(gain / 1000) * 1000));
+  }
+
+  function pace() {
+    const svg = document.getElementById("pace"); svg.innerHTML = "";
+    const W = 800, H = 280, l = 44, r = 14, top = 14, b = 30, iw = W - l - r, ih = H - top - b;
+    const weeks = [];
+    for (let w = 0; w < 13; w++) { const rs = FWD.slice(w * 7, w * 7 + 7); weeks.push({ d: rs[0].d, otb: rs.reduce((a, x) => a + x.otb, 0), stly: rs.reduce((a, x) => a + x.stly, 0) }); }
+    const max = ROOMS * 7;
+    for (let i = 0; i <= 4; i++) { const y = top + ih - ih * i / 4; svg.appendChild(el("line", { x1: l, x2: W - r, y1: y, y2: y, stroke: "var(--line)" })); svg.appendChild(el("text", { x: l - 8, y: y + 4, "text-anchor": "end" }, Math.round(max * i / 4))); }
+    const bw = iw / weeks.length;
+    weeks.forEach((w, i) => {
+      const x = l + i * bw, h = ih * w.otb / max, hs = ih * w.stly / max;
+      const rect = el("rect", { x: x + bw * 0.2, y: top + ih - h, width: bw * 0.6, height: h, fill: "var(--gold)", rx: 1.5 });
+      rect.appendChild(el("title", {}, `${dstr(w.d)} · ${w.otb} vs ${w.stly} ${t().nights}`)); svg.appendChild(rect);
+      svg.appendChild(el("line", { x1: x + bw * 0.12, x2: x + bw * 0.88, y1: top + ih - hs, y2: top + ih - hs, stroke: "var(--ink-2)", "stroke-width": 2.4 }));
+      const g = w.otb - w.stly;
+      svg.appendChild(el("text", { x: x + bw / 2, y: top + ih - Math.max(h, hs) - 8, "text-anchor": "middle", style: "fill:" + (g >= 0 ? "var(--good)" : "var(--bad)") }, (g > 0 ? "+" : "") + g));
+      if (i % 2 === 0) svg.appendChild(el("text", { x: x + bw / 2, y: H - 8, "text-anchor": "middle" }, `${w.d.getUTCDate()} ${t().months[w.d.getUTCMonth()]}`));
+    });
+    document.getElementById("paceSub").textContent = t().paceSub;
+    let worst = null, run = 0, start = null, best = { g: 0 };
+    weeks.forEach(w => { const g = w.otb - w.stly; if (g < 0) { if (!start) start = w; run += g; if (run < best.g) best = { g: run, s: start }; } else { start = null; run = 0; } });
+    document.getElementById("paceInsight").textContent = best.s ? t().paceIns(`${best.s.d.getUTCDate()} ${t().months[best.s.d.getUTCMonth()]}`, num(-best.g)) : "";
+  }
+
+  function lead() {
+    const tot = LEADW.map((_, i) => HIST.reduce((a, r) => a + r.lead[i] * r.sold, 0));
+    const sum = tot.reduce((a, b) => a + b, 0), max = Math.max(...tot);
+    const labs = ["0–3", "4–7", "8–14", "15–30", "31–60", "61–90", "90+"];
+    document.getElementById("lead").innerHTML = tot.map((v, i) => `<div class="bar-row"><span>${labs[i]} ${L === "it" ? "giorni" : "days"}</span><span class="mono">${pct(v / sum, 0)}</span><div class="bar"><i style="width:${(v / max * 100).toFixed(1)}%"></i></div></div>`).join("");
+    document.getElementById("leadInsight").textContent = t().leadIns(pct((tot[0] + tot[1] + tot[2]) / sum, 0));
+  }
+
+  function rec() {
+    const rows = FWD.slice(0, 14).map(f => {
+      const fo = f.fcst / ROOMS;
+      const a = fo >= 0.9 ? "up" : fo < 0.65 ? "down" : "hold";
+      const k = a === "up" ? (fo >= 0.97 ? 1.15 : 1.08) : a === "down" ? 0.92 : 1;
+      return { f, fo, a, price: f.adrNow, np: Math.round(f.adrNow * k / 5) * 5 };
+    });
+    const h = t().colRec;
+    document.getElementById("rec").innerHTML = `<thead><tr>${h.map(x => `<th>${x}</th>`).join("")}</tr></thead><tbody>` + rows.map(r =>
+      `<tr><td>${dstr(r.f.d)}</td><td class="muted">${r.f.ev ? r.f.ev[L] : "—"}</td><td>${r.f.otb} <span class="muted mono">/ ${ROOMS}</span></td><td class="muted">${r.f.stly}</td><td>${pct(r.fo, 0)}</td><td>${eur(r.price)}</td>
+       <td><span class="tag t-${r.a}">${t()[r.a]}</span> <span class="mono muted">${t().why[r.a]}</span></td><td>${r.a === "hold" ? '<span class="muted">' + eur(r.np) + "</span>" : eur(r.np)}</td></tr>`).join("") + "</tbody>";
+  }
+
+  function render() {
+    document.documentElement.lang = L;
+    document.querySelectorAll("[data-t]").forEach(e => { const v = t()[e.dataset.t]; if (typeof v === "string") e.textContent = v; });
+    document.getElementById("lang").textContent = L === "it" ? "EN" : "IT";
+    fillPeriods();
+    const rows = period === "all" ? HIST : HIST.filter(x => x.s.startsWith(period));
+    kpis(rows); perf(rows); channels(rows); pace(); lead(); rec();
+  }
+  document.getElementById("lang").addEventListener("click", () => { L = L === "it" ? "en" : "it"; render(); });
+  document.getElementById("theme").addEventListener("click", () => {
+    const r = document.documentElement; r.dataset.theme = r.dataset.theme === "light" ? "dark" : "light";
+  });
+  render();
+})();
+</script>
+</body>
+</html>
