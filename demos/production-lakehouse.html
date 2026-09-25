@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d0d0f">
+<title>Lakehouse produzione — OEE di linea (demo)</title>
+<meta name="description" content="Demo: pipeline medallion su Databricks che calcola OEE, fermi e qualità di quattro macchine.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  :root { --bg:#0d0d0f; --panel:#151518; --line:rgba(234,230,223,.12); --ink:#eae6df; --ink-2:#8f8b84; --gold:#c8a97e;
+    --good:#8fb996; --bad:#d98c7a; --sans:"Geist","Helvetica Neue",Arial,sans-serif; --mono:"Geist Mono",ui-monospace,Menlo,monospace; color-scheme:dark; }
+  :root[data-theme="light"] { --bg:#e4e4e0; --panel:#edece8; --line:rgba(13,13,15,.14); --ink:#0d0d0f; --ink-2:#57564f; --gold:#8c6a3a; color-scheme:light; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; }
+  button, select { font:inherit; color:inherit; cursor:pointer; }
+  .mono { font-family:var(--mono); font-size:12px; } .muted { color:var(--ink-2); }
+  .wrap { max-width:1320px; margin:0 auto; padding:clamp(20px,3vw,44px); display:grid; gap:20px; }
+  header.top { display:flex; flex-wrap:wrap; gap:18px; justify-content:space-between; align-items:flex-end; }
+  h1 { margin:0; font-size:clamp(30px,4vw,50px); font-weight:300; letter-spacing:-.045em; line-height:1; }
+  .sub { margin:10px 0 0; max-width:62ch; line-height:1.5; color:var(--ink-2); }
+  .btn, select { background:var(--panel); border:1px solid var(--line); border-radius:999px; min-height:42px; padding:0 16px; }
+  .btn:hover, select:hover { border-color:var(--ink-2); }
+  .grid { display:grid; gap:14px; }
+  .kpis { grid-template-columns:repeat(5,minmax(0,1fr)); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; }
+  .kpi .v { font-size:clamp(26px,2.6vw,38px); font-weight:300; letter-spacing:-.04em; margin-top:8px; line-height:1; }
+  .kpi .d { margin-top:8px; font-size:12px; font-family:var(--mono); }
+  .up { color:var(--good); } .down { color:var(--bad); }
+  .two { grid-template-columns:minmax(0,2fr) minmax(0,1fr); }
+  h2 { margin:0 0 4px; font-size:17px; font-weight:500; }
+  svg { display:block; width:100%; height:auto; overflow:visible; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:right; padding:9px 6px; border-top:1px solid var(--line); white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; }
+  th { font-family:var(--mono); font-size:11px; font-weight:400; color:var(--ink-2); text-transform:uppercase; letter-spacing:.04em; }
+  .barra { height:6px; border-radius:3px; background:var(--line); overflow:hidden; }
+  .barra i { display:block; height:100%; background:var(--gold); }
+  .medallion { display:flex; flex-wrap:wrap; align-items:center; gap:10px; font-family:var(--mono); font-size:12px; margin-top:12px; }
+  .medallion span { padding:8px 12px; border:1px solid var(--line); border-radius:8px; }
+  .medallion b { color:var(--gold); font-weight:400; }
+  .qual { display:grid; gap:8px; }
+  .qual div { display:flex; justify-content:space-between; gap:12px; font-size:14px; padding-bottom:8px; border-bottom:1px dashed var(--line); }
+  footer { color:var(--ink-2); font-size:13px; line-height:1.6; border-top:1px solid var(--line); padding-top:18px; }
+  @media (max-width:1000px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} .two{grid-template-columns:1fr;} }
+</style>
+<style id="amir-bar-css">
+.amir-bar{position:relative;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+ padding:10px max(16px,env(safe-area-inset-left,0px));background:#0d0d0f;color:#eae6df;border-bottom:1px solid rgba(234,230,223,.12);
+ font:400 13px/1.3 Geist,'Helvetica Neue',Arial,sans-serif;letter-spacing:.01em}
+.amir-bar a{color:#eae6df;text-decoration:none;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid rgba(234,230,223,.2);border-radius:999px;transition:border-color .2s,color .2s}
+.amir-bar a:hover,.amir-bar a:focus-visible{border-color:#c8a97e;color:#c8a97e;outline:none}
+.amir-bar span{color:#8f8b84;font-family:'Geist Mono',Menlo,monospace;font-size:12px}
+.amir-bar b{font-weight:400;color:#c8a97e}
+</style>
+</head>
+<body>
+<nav class="amir-bar" aria-label="Portfolio"><a href="../index.html#/work/production-lakehouse" id="amirBack" data-it="← Torna al progetto" data-en="← Back to the project">← Torna al progetto</a><span><span id="amirName" data-it="Lakehouse di produzione" data-en="Production lakehouse">Lakehouse di produzione</span> · demo</span></nav>
+<script>(function(){var l='it';try{l=localStorage.getItem('lang')||'it'}catch(e){}
+document.querySelectorAll('.amir-bar [data-'+l+']').forEach(function(el){el.textContent=el.getAttribute('data-'+l)});})();</script>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="mono muted" data-t="eyebrow">Databricks · medallion bronze → silver → gold · dati sintetici</p>
+      <h1 data-t="title">OEE di linea, aggiornato ogni notte</h1>
+      <p class="sub" data-t="sub">Gli eventi dei PLC di quattro macchine passano per una pipeline medallion e diventano OEE per turno, Pareto dei fermi e controlli di qualità del dato. Le macchine e i numeri sono generati.</p>
+      <div class="medallion"><span><b>bronze</b> eventi grezzi</span><span>→</span><span><b>silver</b> puliti e validati</span><span>→</span><span><b>gold</b> OEE e fermi</span><span>→</span><span>Power BI</span></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="macchina" aria-label="Macchina"></select>
+      <button class="btn" id="lang">EN</button>
+      <button class="btn" id="theme" aria-label="Tema">◐</button>
+    </div>
+  </header>
+
+  <section class="grid kpis" id="kpis"></section>
+
+  <section class="grid two">
+    <div class="card">
+      <h2 data-t="andamento">OEE per settimana</h2>
+      <p class="mono muted" data-t="andamentoSub">Linea: OEE · area chiara: obiettivo 85%</p>
+      <svg id="trend" viewBox="0 0 800 280" role="img" aria-label="OEE per settimana"></svg>
+    </div>
+    <div class="card">
+      <h2 data-t="componenti">Le tre componenti</h2>
+      <p class="mono muted" data-t="componentiSub">Dove si perde l'OEE</p>
+      <div id="componenti" style="margin-top:14px;display:grid;gap:14px"></div>
+      <h2 style="margin-top:22px" data-t="turni">OEE per turno</h2>
+      <div id="turni" style="margin-top:10px;display:grid;gap:10px"></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div class="card">
+      <h2 data-t="pareto">Pareto dei fermi</h2>
+      <p class="mono muted" data-t="paretoSub">Le prime tre cause valgono quasi tre quarti del tempo perso</p>
+      <svg id="pareto" viewBox="0 0 800 260" role="img" aria-label="Pareto delle cause di fermo"></svg>
+    </div>
+    <div class="card">
+      <h2 data-t="macchine">Macchine a confronto</h2>
+      <table style="margin-top:12px">
+        <thead><tr><th data-t="macchina">Macchina</th><th>OEE</th><th data-t="disp">Disp.</th><th data-t="prest">Prest.</th><th data-t="qual">Qual.</th></tr></thead>
+        <tbody id="macchine"></tbody>
+      </table>
+      <h2 style="margin-top:22px" data-t="qualitaDati">Qualità del dato</h2>
+      <div class="qual" id="qualitaDati" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <footer>
+    <p data-t="footer">Progetto dimostrativo di Betty. Nel repository: i tre notebook PySpark con Auto Loader, merge Delta e tabella di quarantena, il job Databricks schedulato alle 02:30, e una versione locale in pandas che produce esattamente questi numeri senza cluster.</p>
+  </footer>
+</div>
+
+<script>
+const DATA = {"kpi":{"oee_medio":0.8287640322580645,"disponibilita":0.948588870967742,"prestazione":0.8919167741935483,"qualita":0.9795770967741936,"pezzi":710938,"scarti":14667,"ore_fermo":254.9933333333333,"turni":620,"periodo":["2026-01-07","2026-04-01"]},"per_macchina":[{"macchina":"LIN-01 Pressa","disponibilita":0.9408,"prestazione":0.8885,"qualita":0.9785,"oee":0.8182},{"macchina":"LIN-02 Tornio CNC","disponibilita":0.9491,"prestazione":0.8947,"qualita":0.9803,"oee":0.8319},{"macchina":"LIN-03 Saldatrice","disponibilita":0.9486,"prestazione":0.895,"qualita":0.9792,"oee":0.8317},{"macchina":"LIN-04 Assemblaggio","disponibilita":0.9559,"prestazione":0.8894,"qualita":0.9803,"oee":0.8332}],"per_settimana":[{"settimana":2,"oee":0.8253,"disponibilita":0.9479,"prestazione":0.8887,"qualita":0.9792},{"settimana":3,"oee":0.8324,"disponibilita":0.9508,"prestazione":0.893,"qualita":0.98},{"settimana":4,"oee":0.8436,"disponibilita":0.9477,"prestazione":0.9078,"qualita":0.981},{"settimana":5,"oee":0.832,"disponibilita":0.9554,"prestazione":0.8873,"qualita":0.9805},{"settimana":6,"oee":0.8185,"disponibilita":0.9481,"prestazione":0.8833,"qualita":0.9791},{"settimana":7,"oee":0.829,"disponibilita":0.9494,"prestazione":0.8911,"qualita":0.9807},{"settimana":8,"oee":0.8147,"disponibilita":0.941,"prestazione":0.8836,"qualita":0.9795},{"settimana":9,"oee":0.831,"disponibilita":0.955,"prestazione":0.8877,"qualita":0.9794},{"settimana":10,"oee":0.8257,"disponibilita":0.9372,"prestazione":0.9003,"qualita":0.9787},{"settimana":11,"oee":0.8155,"disponibilita":0.9398,"prestazione":0.8881,"qualita":0.9771},{"settimana":12,"oee":0.84,"disponibilita":0.9511,"prestazione":0.9028,"qualita":0.9779},{"settimana":13,"oee":0.8425,"disponibilita":0.9546,"prestazione":0.9004,"qualita":0.9804},{"settimana":14,"oee":0.8142,"disponibilita":0.9613,"prestazione":0.8619,"qualita":0.983}],"per_turno":[{"turno":"Mattino","oee":0.825},{"turno":"Notte","oee":0.8218},{"turno":"Pomeriggio","oee":0.8368}],"pareto":[{"causa":"Guasto meccanico","minuti":4972.4,"episodi":98,"quota":0.3042,"cumulata":0.3042},{"causa":"Cambio stampo","minuti":3689.4,"episodi":167,"quota":0.2257,"cumulata":0.5298},{"causa":"Manutenzione programmata","minuti":3244.6,"episodi":56,"quota":0.1985,"cumulata":0.7283},{"causa":"Mancanza materiale","minuti":2126.3,"episodi":129,"quota":0.1301,"cumulata":0.8584},{"causa":"Regolazione qualità","minuti":1402.7,"episodi":127,"quota":0.0858,"cumulata":0.9442},{"causa":"Attesa operatore","minuti":913.0,"episodi":96,"quota":0.0558,"cumulata":1.0}],"qualita_dati":{"righe_bronze":1340,"duplicati_rimossi":30,"righe_scartate":17,"righe_silver":1293,"attese":{"timestamp valorizzato":{"passate":1300,"fallite":10},"durata positiva":{"passate":1310,"fallite":0},"pezzi non negativi":{"passate":1303,"fallite":7},"scarti entro i pezzi":{"passate":1303,"fallite":7},"causa presente sui fermi":{"passate":1310,"fallite":0}}}};
+const T = { en: {
+  eyebrow: "Databricks · medallion bronze → silver → gold · synthetic data",
+  title: "Line OEE, refreshed every night",
+  sub: "PLC events from four machines run through a medallion pipeline and become OEE per shift, a Pareto of downtime and data quality checks. The machines and numbers are generated.",
+  andamento: "OEE per week", andamentoSub: "Line: OEE · light band: 85% target",
+  componenti: "The three components", componentiSub: "Where the OEE is lost", turni: "OEE by shift",
+  pareto: "Downtime Pareto", paretoSub: "The top three causes are nearly three quarters of the lost time",
+  macchine: "Machines compared", macchina: "Machine", disp: "Avail.", prest: "Perf.", qual: "Qual.",
+  qualitaDati: "Data quality",
+  footer: "Demo project by Betty. In the repository: three PySpark notebooks with Auto Loader, Delta merge and a quarantine table, the Databricks job scheduled at 02:30, and a local pandas version that produces exactly these numbers without a cluster.",
+  kOee: "Average OEE", kDisp: "Availability", kPrest: "Performance", kQual: "Quality", kFermi: "Downtime",
+  dOee: "target 85%", dDisp: "of planned time", dPrest: "against ideal cycle", dQual: "good pieces", dFermi: "hours in the period",
+  tutte: "All machines", mattino: "Morning", pomeriggio: "Afternoon", notte: "Night"
+}};
+let LANG = "it", MACCHINA = "tutte";
+const loc = () => LANG === "it" ? "it-IT" : "en-GB";
+const pct = (v, d = 1) => (v * 100).toLocaleString(loc(), { minimumFractionDigits: d, maximumFractionDigits: d }) + "%";
+const num = (v, d = 0) => v.toLocaleString(loc(), { minimumFractionDigits: d, maximumFractionDigits: d });
+const t = (k, f) => LANG === "en" ? (T.en[k] ?? f) : f;
+const turnoNome = n => LANG === "en" ? ({ Mattino: "Morning", Pomeriggio: "Afternoon", Notte: "Night" }[n] || n) : n;
+
+const sel = document.getElementById("macchina");
+function filtri() {
+  sel.innerHTML = "";
+  sel.add(new Option(LANG === "it" ? "Tutte le macchine" : "All machines", "tutte"));
+  DATA.per_macchina.forEach(m => sel.add(new Option(m.macchina, m.macchina)));
+  sel.value = MACCHINA;
+}
+const macchinaSel = () => DATA.per_macchina.find(m => m.macchina === MACCHINA);
+
+function kpis() {
+  const k = DATA.kpi, m = macchinaSel();
+  const oee = m ? m.oee : k.oee_medio, disp = m ? m.disponibilita : k.disponibilita;
+  const prest = m ? m.prestazione : k.prestazione, qual = m ? m.qualita : k.qualita;
+  const cards = [
+    { k: "kOee", l: "OEE medio", v: pct(oee), d: (oee >= 0.85 ? "▲ " : "▼ ") + pct(Math.abs(oee - 0.85)) + " " + t("dOee", "sull'obiettivo 85%"), cls: oee >= 0.85 ? "up" : "down" },
+    { k: "kDisp", l: "Disponibilità", v: pct(disp), d: t("dDisp", "del tempo pianificato") },
+    { k: "kPrest", l: "Prestazione", v: pct(prest), d: t("dPrest", "rispetto al ciclo ideale") },
+    { k: "kQual", l: "Qualità", v: pct(qual), d: t("dQual", "pezzi buoni") },
+    { k: "kFermi", l: "Fermi", v: num(k.ore_fermo) + " h", d: t("dFermi", "nel periodo") }
+  ];
+  document.getElementById("kpis").innerHTML = cards.map(c =>
+    `<div class="card kpi"><div class="mono muted">${t(c.k, c.l)}</div><div class="v">${c.v}</div><div class="d ${c.cls || "muted"}">${c.d}</div></div>`).join("");
+}
+
+function trend() {
+  const s = DATA.per_settimana, W = 800, H = 280, ml = 50, mr = 16, mt = 16, mb = 32;
+  const iw = W - ml - mr, ih = H - mt - mb;
+  const y = v => mt + ih - ih * ((v - 0.6) / 0.4);
+  let svg = `<rect x="${ml}" y="${mt}" width="${iw}" height="${y(0.85) - mt}" fill="var(--gold)" opacity=".07"/>`;
+  svg += `<line x1="${ml}" y1="${y(0.85)}" x2="${W - mr}" y2="${y(0.85)}" stroke="var(--gold)" stroke-dasharray="4 4"/>`;
+  [0.6, 0.7, 0.8, 0.9, 1].forEach(v => {
+    svg += `<line x1="${ml}" y1="${y(v)}" x2="${W - mr}" y2="${y(v)}" stroke="var(--line)"/>`;
+    svg += `<text x="${ml - 10}" y="${y(v) + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--ink-2)">${pct(v, 0)}</text>`;
+  });
+  const pts = s.map((r, i) => [ml + iw * (i + 0.5) / s.length, y(r.oee)]);
+  svg += `<polyline fill="none" stroke="var(--gold)" stroke-width="2" points="${pts.map(p => p.map(v => v.toFixed(1)).join(",")).join(" ")}"/>`;
+  pts.forEach((p, i) => {
+    svg += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="var(--gold)"><title>sett. ${s[i].settimana} · ${pct(s[i].oee)}</title></circle>`;
+    if (i % 2 === 0) svg += `<text x="${p[0].toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--ink-2)">S${s[i].settimana}</text>`;
+  });
+  document.getElementById("trend").innerHTML = svg;
+}
+
+function componenti() {
+  const m = macchinaSel(), k = DATA.kpi;
+  const righe = [
+    ["Disponibilità", "Availability", m ? m.disponibilita : k.disponibilita],
+    ["Prestazione", "Performance", m ? m.prestazione : k.prestazione],
+    ["Qualità", "Quality", m ? m.qualita : k.qualita]
+  ];
+  document.getElementById("componenti").innerHTML = righe.map(([it, en, v]) => `
+    <div><div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px"><span>${LANG === "en" ? en : it}</span><span class="mono">${pct(v)}</span></div>
+    <div class="barra"><i style="width:${(v * 100).toFixed(1)}%;background:${v >= 0.95 ? "var(--good)" : v >= 0.85 ? "var(--gold)" : "var(--bad)"}"></i></div></div>`).join("");
+  const max = Math.max(...DATA.per_turno.map(t => t.oee));
+  document.getElementById("turni").innerHTML = DATA.per_turno.map(t => `
+    <div><div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px"><span>${turnoNome(t.turno)}</span><span class="mono">${pct(t.oee)}</span></div>
+    <div class="barra"><i style="width:${(100 * t.oee / max).toFixed(1)}%"></i></div></div>`).join("");
+}
+
+function pareto() {
+  const p = DATA.pareto, W = 800, H = 260, ml = 50, mr = 42, mt = 16, mb = 62;
+  const iw = W - ml - mr, ih = H - mt - mb;
+  const max = Math.max(...p.map(r => r.minuti));
+  const bw = iw / p.length * 0.6;
+  let svg = "";
+  p.forEach((r, i) => {
+    const x = ml + iw * (i + 0.5) / p.length, h = ih * r.minuti / max;
+    svg += `<rect x="${(x - bw / 2).toFixed(1)}" y="${(mt + ih - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${i < 3 ? "var(--gold)" : "var(--ink-2)"}"><title>${r.causa} · ${num(r.minuti / 60)} h</title></rect>`;
+    svg += `<text x="${x}" y="${H - 44}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--ink-2)">${num(r.minuti / 60)} h</text>`;
+    const parole = r.causa.split(" ");
+    svg += `<text x="${x}" y="${H - 26}" text-anchor="middle" font-size="10" fill="var(--ink-2)">${parole[0]}</text>`;
+    if (parole[1]) svg += `<text x="${x}" y="${H - 14}" text-anchor="middle" font-size="10" fill="var(--ink-2)">${parole.slice(1).join(" ")}</text>`;
+  });
+  const cum = p.map((r, i) => [ml + iw * (i + 0.5) / p.length, mt + ih - ih * r.cumulata]);
+  svg += `<polyline fill="none" stroke="var(--ink)" stroke-width="1.6" points="${cum.map(c => c.map(v => v.toFixed(1)).join(",")).join(" ")}"/>`;
+  cum.forEach((c, i) => svg += `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="2.5" fill="var(--ink)"><title>${pct(p[i].cumulata)}</title></circle>`);
+  [0, .5, 1].forEach(v => svg += `<text x="${W - mr + 8}" y="${(mt + ih - ih * v + 4).toFixed(1)}" font-size="11" font-family="var(--mono)" fill="var(--ink-2)">${pct(v, 0)}</text>`);
+  document.getElementById("pareto").innerHTML = svg;
+}
+
+function tabelle() {
+  document.getElementById("macchine").innerHTML = DATA.per_macchina.map(m =>
+    `<tr><td>${m.macchina}</td><td class="${m.oee >= 0.85 ? "up" : "down"}">${pct(m.oee)}</td><td>${pct(m.disponibilita)}</td><td>${pct(m.prestazione)}</td><td>${pct(m.qualita)}</td></tr>`).join("");
+  const q = DATA.qualita_dati;
+  const righe = [
+    [`Righe bronze`, `Bronze rows`, num(q.righe_bronze)],
+    [`Duplicati rimossi`, `Duplicates removed`, num(q.duplicati_rimossi)],
+    [`Righe in quarantena`, `Rows quarantined`, num(q.righe_scartate)],
+    [`Righe silver`, `Silver rows`, num(q.righe_silver)],
+    [`Attese superate`, `Expectations passed`, Object.keys(q.attese).length + "/" + Object.keys(q.attese).length]
+  ];
+  document.getElementById("qualitaDati").innerHTML = righe.map(([it, en, v]) =>
+    `<div><span class="muted">${LANG === "en" ? en : it}</span><span class="mono">${v}</span></div>`).join("");
+}
+
+function applyLang() {
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-t]").forEach(el => {
+    const k = el.getAttribute("data-t");
+    if (!el.dataset.it) el.dataset.it = el.textContent;
+    el.textContent = LANG === "en" ? (T.en[k] ?? el.dataset.it) : el.dataset.it;
+  });
+  document.getElementById("lang").textContent = LANG === "it" ? "EN" : "IT";
+  filtri(); render();
+}
+function render() { kpis(); trend(); componenti(); pareto(); tabelle(); }
+sel.addEventListener("change", e => { MACCHINA = e.target.value; render(); });
+document.getElementById("lang").addEventListener("click", () => { LANG = LANG === "it" ? "en" : "it"; applyLang(); });
+document.getElementById("theme").addEventListener("click", () => {
+  const light = document.documentElement.getAttribute("data-theme") === "light";
+  document.documentElement.setAttribute("data-theme", light ? "dark" : "light");
+});
+applyLang();
+</script>
+</body>
+</html>
